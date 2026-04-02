@@ -42,6 +42,3 @@ python3 app.py
 ### Build
 pyinstaller --onefile --windowed app.py
 
----
-
-batompreto 🖤💄
