@@ -1,0 +1,110 @@
+import tkinter as tk
+from tkinter import messagebox
+import os
+
+def play_sound():
+    # tenta tocar som simples (Fedora geralmente tem paplay)
+    os.system("paplay /usr/share/sounds/freedesktop/stereo/message.oga 2>/dev/null")
+
+def traduzir(destino):
+    texto = entrada.get("1.0", tk.END).strip()
+    if not texto:
+        return
+
+    try:
+        result = subprocess.run(
+            ["crow", "-i", "-b", "-t", destino],
+            input=texto,
+            text=True,
+            capture_output=True
+        )
+
+        traducao = result.stdout.strip()
+
+        if not traducao:
+            messagebox.showerror("batompreto", "Erro na tradução")
+            return
+
+        saida.delete("1.0", tk.END)
+        saida.insert(tk.END, traducao)
+
+        root.clipboard_clear()
+        root.clipboard_append(traducao)
+
+        play_sound()
+
+    except Exception as e:
+        messagebox.showerror("batompreto", str(e))
+
+def traduz_pt_en():
+    traduzir("en")
+
+def traduz_en_pt():
+    traduzir("pt")
+
+def mover_janela(event):
+    root.geometry(f"+{event.x_root}+{event.y_root}")
+
+root = tk.Tk()
+root.title("batompreto 🐱💄")
+
+# 🖤 overlay sem borda
+root.overrideredirect(True)
+root.attributes("-topmost", True)
+root.configure(bg="#0f0f0f")
+
+# posição inicial (canto)
+root.geometry("380x260+20+60")
+
+# 🐱 título arrastável
+top_bar = tk.Label(
+    root,
+    text="🐱💄 batompreto",
+    bg="#0f0f0f",
+    fg="white",
+    font=("Arial", 12, "bold")
+)
+top_bar.pack(fill="x")
+top_bar.bind("<B1-Motion>", mover_janela)
+
+entrada = tk.Text(
+    root,
+    height=4,
+    bg="#1a1a1a",
+    fg="white",
+    insertbackground="white",
+    relief="flat"
+)
+entrada.pack(padx=8, pady=6, fill="both")
+
+btn_frame = tk.Frame(root, bg="#0f0f0f")
+btn_frame.pack()
+
+btn1 = tk.Button(btn_frame, text="PT → EN 💄", command=traduz_pt_en, bg="#222", fg="white")
+btn1.pack(side="left", padx=5)
+
+btn2 = tk.Button(btn_frame, text="EN → PT 🐱", command=traduz_en_pt, bg="#222", fg="white")
+btn2.pack(side="left", padx=5)
+
+saida = tk.Text(
+    root,
+    height=4,
+    bg="#1a1a1a",
+    fg="#00ff9c",
+    insertbackground="white",
+    relief="flat"
+)
+saida.pack(padx=8, pady=6, fill="both")
+
+# botão fechar pequeno
+close_btn = tk.Button(
+    root,
+    text="✕",
+    command=root.destroy,
+    bg="#0f0f0f",
+    fg="white",
+    borderwidth=0
+)
+close_btn.place(x=360, y=0)
+
+root.mainloop()
