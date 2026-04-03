@@ -10,6 +10,8 @@ import re
 import pytesseract
 from PIL import Image, ImageOps, ImageFilter
 import mss
+from collections import deque
+from difflib import SequenceMatcher
 
 lock_file = "/tmp/batompreto.lock"
 
@@ -43,6 +45,11 @@ ocr_enabled_default = False
 tesseract_lang = "eng"
 
 ultimo_texto_ocr = ""
+MANUAL_SEND_COOLDOWN_SECONDS = 2.5
+SAFE_OUTPUT_MAX_CHARS = 140
+HISTORY_SIMILARITY_THRESHOLD = 0.88
+last_manual_copy_time = 0.0
+recent_manual_outputs = deque(maxlen=5)
 
 
 def play_sound():
@@ -73,13 +80,19 @@ def animate_title():
     title_label.config(text=titles[title_state])
     root.after(1200, animate_title)
 
-
 def copiar_resultado():
     texto = saida.get("1.0", tk.END).strip()
-    if texto:
-        root.clipboard_clear()
-        root.clipboard_append(texto)
-        status_var.set("Copied result 🖤")
+    if not texto:
+        status_var.set("Nothing to copy.")
+        return
+
+    copiou, texto_final = copiar_para_area_de_transferencia(texto)
+
+    if texto_final:
+        mostrar_saida(texto_final)
+
+    if copiou:
+        status_var.set("Copied safe result.")
         play_sound()
 
 
@@ -101,6 +114,62 @@ def salvar_nicks():
     status_var.set(f"Nicks saved: {', '.join(SEUS_NICKS_MINECRAFT) if SEUS_NICKS_MINECRAFT else 'none'}")
     play_sound()
 
+def normalizar_texto_chat(texto):
+    texto = texto.strip()
+    texto = re.sub(r"\s+", " ", texto)
+    texto = re.sub(r"[!?]{2,}", "!", texto)
+    texto = re.sub(r"\.{2,}", ".", texto)
+    texto = re.sub(r"([,;:]){2,}", r"\1", texto)
+    return texto
+
+
+def similaridade_texto(a, b):
+    return SequenceMatcher(None, a.lower(), b.lower()).ratio()
+
+
+def preparar_texto_para_chat(texto):
+    texto = normalizar_texto_chat(texto)
+
+    if len(texto) < 2:
+        return None, "Text too short."
+
+    if len(texto) > SAFE_OUTPUT_MAX_CHARS:
+        texto = texto[:SAFE_OUTPUT_MAX_CHARS].rstrip()
+
+    return texto, None
+
+
+def pode_copiar_agora(texto):
+    global last_manual_copy_time
+
+    agora = time.time()
+    if agora - last_manual_copy_time < MANUAL_SEND_COOLDOWN_SECONDS:
+        faltando = MANUAL_SEND_COOLDOWN_SECONDS - (agora - last_manual_copy_time)
+        return False, f"Wait {faltando:.1f}s before copying again."
+
+    for anterior in recent_manual_outputs:
+        if similaridade_texto(texto, anterior) >= HISTORY_SIMILARITY_THRESHOLD:
+            return False, "Very similar message blocked to avoid spam."
+
+    last_manual_copy_time = agora
+    recent_manual_outputs.append(texto)
+    return True, None
+
+
+def copiar_para_area_de_transferencia(texto):
+    texto_pronto, erro = preparar_texto_para_chat(texto)
+    if erro:
+        status_var.set(erro)
+        return False, None
+
+    ok, motivo = pode_copiar_agora(texto_pronto)
+    if not ok:
+        status_var.set(motivo)
+        return False, texto_pronto
+
+    root.clipboard_clear()
+    root.clipboard_append(texto_pronto)
+    return True, texto_pronto
 
 def traduzir_texto(texto, destino):
     result = subprocess.run(
@@ -120,35 +189,46 @@ def mostrar_saida(texto):
     saida.insert("1.0", texto)
     saida.see("1.0")
 
-
 def traduzir(destino):
-    texto = entrada.get("1.0", tk.END).strip()
-    if not texto:
-        status_var.set("Type or paste some text first.")
-        return
-
     try:
-        traducao, erro = traduzir_texto(texto, destino)
-
-        if not traducao:
-            if erro:
-                messagebox.showerror("batompreto", erro)
-                status_var.set("Translation failed.")
-            else:
-                messagebox.showerror("batompreto", "No translation returned.")
-                status_var.set("No translation returned.")
+        texto = entrada.get("1.0", tk.END).strip()
+        if not texto:
+            status_var.set("Digite algo primeiro.")
             return
 
+        traducao = traduzir_texto(texto, destino)
+
+        # CORREÇÃO DA TUPLA
+        if isinstance(traducao, tuple):
+            traducao = traducao[0]
+
+        if traducao.startswith("Erro") or traducao.startswith("Error"):
+            status_var.set(traducao)
+            return
+
+        texto_chat, erro_chat = preparar_texto_para_chat(traducao)
+        if erro_chat:
+            status_var.set(erro_chat)
+            return
+
+        traducao = texto_chat
         mostrar_saida(traducao)
 
         if auto_copy_var.get():
-            root.clipboard_clear()
-            root.clipboard_append(traducao)
+            copiou, texto_final = copiar_para_area_de_transferencia(traducao)
+
+            if texto_final:
+                traducao = texto_final
+                mostrar_saida(traducao)
+
+            if not copiou:
+                focus_input()
+                return
 
         if destino == "en":
-            status_var.set("Translated to English 💄")
+            status_var.set("Translated to English.")
         else:
-            status_var.set("Traduzido para português 🐱")
+            status_var.set("Traduzido para português.")
 
         play_sound()
         focus_input()
@@ -156,7 +236,6 @@ def traduzir(destino):
     except Exception as e:
         messagebox.showerror("batompreto", str(e))
         status_var.set("Unexpected error.")
-
 
 def traduz_pt_en():
     mode_var.set("en")
