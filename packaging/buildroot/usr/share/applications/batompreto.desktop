@@ -1,0 +1,10 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=batompreto
+Comment=Floating OCR translator (PT ↔ EN)
+Exec=/usr/bin/batompreto
+Icon=/usr/share/pixmaps/batompreto.png
+Terminal=false
+Categories=Utility;
+StartupNotify=false
