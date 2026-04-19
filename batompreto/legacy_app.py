@@ -70,6 +70,73 @@ def focus_input(event=None):
     root.after(10, lambda: entrada.focus_force())
 
 
+def abrir_frases():
+    janela = tk.Toplevel(root)
+    janela.title("Frases rápidas 🖤")
+    janela.configure(bg="#090909")
+    janela.geometry("420x420")
+    janela.attributes("-topmost", True)
+
+    lista = tk.Listbox(
+        janela,
+        bg="#101914",
+        fg="#8fffc7",
+        selectbackground="#2f4a3a",
+        selectforeground="white",
+        relief="flat",
+        highlightthickness=1,
+        highlightbackground="#203328",
+        highlightcolor="#2f4a3a",
+    )
+    lista.pack(fill="both", expand=True, padx=8, pady=8)
+
+    itens = []
+
+    for categoria, frases in quick_phrases.items():
+        lista.insert(tk.END, f"── {categoria.upper()} ──")
+        itens.append(None)
+
+        for frase in frases:
+            texto = f'{frase["pt"]} | {frase["en"]}'
+            lista.insert(tk.END, texto)
+            itens.append(frase)
+
+    def inserir_frase(lang="en"):
+        selecao = lista.curselection()
+        if not selecao:
+            return
+
+        index = selecao[0]
+        frase = itens[index]
+
+        if frase is None:
+            return
+
+        entrada.delete("1.0", tk.END)
+        entrada.insert(tk.END, frase[lang])
+        status_var.set(f"Inserted ({lang.upper()})")
+        janela.lift()
+        focus_input()
+
+    def inserir_en(event=None):
+        inserir_frase("en")
+
+    def inserir_pt(event=None):
+        inserir_frase("pt")
+
+    lista.bind("<Double-Button-1>", inserir_en)
+    lista.bind("<Button-3>", inserir_pt)
+
+    dica = tk.Label(
+        janela,
+        text="Double click = EN | Right click = PT",
+        bg="#090909",
+        fg="#8f8f8f",
+        font=("Arial", 8),
+    )
+    dica.pack(pady=(0, 8))
+
+
 def animate_title():
     global title_state
     title_state = (title_state + 1) % 4
@@ -81,6 +148,7 @@ def animate_title():
     ]
     title_label.config(text=titles[title_state])
     root.after(1200, animate_title)
+
 
 def copiar_resultado():
     texto = saida.get("1.0", tk.END).strip()
@@ -96,6 +164,8 @@ def copiar_resultado():
     if copiou:
         status_var.set("Copied safe result.")
         play_sound()
+    else:
+        status_var.set("Copy blocked or failed.")
 
 
 def get_target_lang():
@@ -113,8 +183,11 @@ def salvar_nicks():
     global SEUS_NICKS_MINECRAFT
     novos_nicks = get_nicks_from_ui()
     SEUS_NICKS_MINECRAFT = novos_nicks
-    status_var.set(f"Nicks saved: {', '.join(SEUS_NICKS_MINECRAFT) if SEUS_NICKS_MINECRAFT else 'none'}")
+    status_var.set(
+        f"Nicks saved: {', '.join(SEUS_NICKS_MINECRAFT) if SEUS_NICKS_MINECRAFT else 'none'}"
+    )
     play_sound()
+
 
 def normalizar_texto_chat(texto):
     texto = texto.strip()
@@ -173,12 +246,13 @@ def copiar_para_area_de_transferencia(texto):
     root.clipboard_append(texto_pronto)
     return True, texto_pronto
 
+
 def traduzir_texto(texto, destino):
     result = subprocess.run(
         ["crow", "-i", "-b", "-t", destino],
         input=texto,
         text=True,
-        capture_output=True
+        capture_output=True,
     )
     traducao = result.stdout.strip()
     erro = result.stderr.strip()
@@ -191,6 +265,7 @@ def mostrar_saida(texto):
     saida.insert("1.0", texto)
     saida.see("1.0")
 
+
 def traduzir(destino):
     try:
         texto = entrada.get("1.0", tk.END).strip()
@@ -200,7 +275,6 @@ def traduzir(destino):
 
         traducao = traduzir_texto(texto, destino)
 
-        # CORREÇÃO DA TUPLA
         if isinstance(traducao, tuple):
             traducao = traducao[0]
 
@@ -238,6 +312,7 @@ def traduzir(destino):
     except Exception as e:
         messagebox.showerror("batompreto", str(e))
         status_var.set("Unexpected error.")
+
 
 def traduz_pt_en():
     mode_var.set("en")
@@ -336,20 +411,20 @@ def limpar_texto_ocr(texto):
     ]
 
     for linha in texto.splitlines():
-        l = linha.strip()
-        if not l or len(l) < 3:
+        linha_limpa = linha.strip()
+        if not linha_limpa or len(linha_limpa) < 3:
             continue
-        if all(ch in "-_=|/\\[](){}<>.:;,'`~" for ch in l):
+        if all(ch in "-_=|/\\[](){}<>.:;,'`~" for ch in linha_limpa):
             continue
-        if any(p in l.lower() for p in lixo):
+        if any(p in linha_limpa.lower() for p in lixo):
             continue
-        linhas.append(l)
+        linhas.append(linha_limpa)
 
     return "\n".join(linhas[-2:]).strip()
 
 
 def extrair_mensagem_relevante(texto):
-    linhas = [l.strip() for l in texto.splitlines() if l.strip()]
+    linhas = [linha.strip() for linha in texto.splitlines() if linha.strip()]
     if not linhas:
         return None
 
@@ -438,7 +513,13 @@ def loop_traducao_chat():
                     atualizar_saida_threadsafe(traducao)
                     atualizar_status_threadsafe("Important chat translated 🐱")
                     if auto_copy_var.get():
-                        root.after(0, lambda t=traducao: (root.clipboard_clear(), root.clipboard_append(t)))
+                        root.after(
+                            0,
+                            lambda t=traducao: (
+                                root.clipboard_clear(),
+                                root.clipboard_append(t),
+                            ),
+                        )
                     play_sound()
 
         except Exception:
@@ -471,19 +552,19 @@ root = tk.Tk()
 root.title("batompreto 🖤")
 
 quick_phrases = load_quick_phrases()
-print("Frases carregadas:", quick_phrases.keys())
 
 try:
     root.iconphoto(True, tk.PhotoImage(file=os.path.expanduser("~/batompreto/icon.png")))
 except Exception as e:
     print("Erro ao carregar ícone:", e)
+
 root.overrideredirect(False)
 root.after(50, lambda: root.overrideredirect(True))
 root.attributes("-topmost", True)
 root.attributes("-alpha", 0.78)
 root.configure(bg="#090909")
-root.geometry("460x470+3360+40")
-root.minsize(460, 470)
+root.geometry("480x560+3360+40")
+root.minsize(480, 560)
 
 topmost_var = tk.BooleanVar(value=True)
 auto_copy_var = tk.BooleanVar(value=True)
@@ -496,7 +577,7 @@ outer = tk.Frame(
     root,
     bg="#141414",
     highlightthickness=1,
-    highlightbackground="#2d2d2d"
+    highlightbackground="#2d2d2d",
 )
 outer.pack(fill="both", expand=True)
 
@@ -512,7 +593,7 @@ title_label = tk.Label(
     text="🐱💄 batompreto",
     bg="#101010",
     fg="white",
-    font=("Arial", 10, "bold")
+    font=("Arial", 10, "bold"),
 )
 title_label.pack(side="left", padx=8)
 title_label.bind("<Button-1>", iniciar_movimento)
@@ -529,19 +610,49 @@ close_btn = tk.Button(
     relief="flat",
     borderwidth=0,
     padx=8,
-    pady=1
+    pady=1,
 )
 close_btn.pack(side="right", padx=4)
 
+frases_top_btn = tk.Button(
+    top_bar,
+    text="⚡",
+    command=abrir_frases,
+    bg="#101010",
+    fg="white",
+    activebackground="#2b2b2b",
+    activeforeground="white",
+    relief="flat",
+    borderwidth=0,
+    padx=8,
+    pady=1,
+)
+frases_top_btn.pack(side="right", padx=2)
+
 body = tk.Frame(outer, bg="#090909")
 body.pack(fill="both", expand=True, padx=8, pady=8)
+
+frases_btn_big = tk.Button(
+    body,
+    text="⚡ Frases rápidas",
+    command=abrir_frases,
+    bg="#1d1d1d",
+    fg="white",
+    activebackground="#2b2b2b",
+    activeforeground="white",
+    relief="flat",
+    borderwidth=0,
+    padx=8,
+    pady=3,
+)
+frases_btn_big.pack(anchor="w", pady=(0, 6))
 
 nicks_label = tk.Label(
     body,
     text="Nicks (comma separated)",
     bg="#090909",
     fg="#d0d0d0",
-    font=("Arial", 9, "bold")
+    font=("Arial", 9, "bold"),
 )
 nicks_label.pack(anchor="w")
 
@@ -550,7 +661,7 @@ nicks_entry = tk.Entry(
     bg="#151515",
     fg="#ffffff",
     insertbackground="white",
-    relief="flat"
+    relief="flat",
 )
 nicks_entry.pack(fill="x", pady=(4, 6))
 nicks_entry.insert(0, "")
@@ -564,7 +675,7 @@ save_nicks_btn = tk.Button(
     activebackground="#2b2b2b",
     activeforeground="white",
     relief="flat",
-    borderwidth=0
+    borderwidth=0,
 )
 save_nicks_btn.pack(anchor="w", pady=(0, 8))
 
@@ -573,7 +684,7 @@ entrada_label = tk.Label(
     text="Input",
     bg="#090909",
     fg="#d0d0d0",
-    font=("Arial", 9, "bold")
+    font=("Arial", 9, "bold"),
 )
 entrada_label.pack(anchor="w")
 
@@ -588,7 +699,7 @@ entrada = tk.Text(
     highlightbackground="#292929",
     highlightcolor="#3a3a3a",
     padx=8,
-    pady=8
+    pady=8,
 )
 entrada.pack(fill="x", pady=(4, 6))
 entrada.bind("<Button-1>", focus_input)
@@ -611,7 +722,7 @@ btn_pt_en = tk.Button(
     activeforeground="white",
     width=10,
     relief="flat",
-    borderwidth=0
+    borderwidth=0,
 )
 btn_pt_en.grid(row=0, column=0, padx=3, pady=3)
 
@@ -625,7 +736,7 @@ btn_en_pt = tk.Button(
     activeforeground="white",
     width=10,
     relief="flat",
-    borderwidth=0
+    borderwidth=0,
 )
 btn_en_pt.grid(row=0, column=1, padx=3, pady=3)
 
@@ -639,7 +750,7 @@ btn_copy = tk.Button(
     activeforeground="white",
     width=10,
     relief="flat",
-    borderwidth=0
+    borderwidth=0,
 )
 btn_copy.grid(row=0, column=2, padx=3, pady=3)
 
@@ -653,7 +764,7 @@ btn_clear = tk.Button(
     activeforeground="white",
     width=10,
     relief="flat",
-    borderwidth=0
+    borderwidth=0,
 )
 btn_clear.grid(row=0, column=3, padx=3, pady=3)
 
@@ -669,7 +780,7 @@ top_chk = tk.Checkbutton(
     fg="white",
     selectcolor="#151515",
     activebackground="#090909",
-    activeforeground="white"
+    activeforeground="white",
 )
 top_chk.grid(row=0, column=0, padx=6)
 
@@ -681,7 +792,7 @@ copy_chk = tk.Checkbutton(
     fg="white",
     selectcolor="#151515",
     activebackground="#090909",
-    activeforeground="white"
+    activeforeground="white",
 )
 copy_chk.grid(row=0, column=1, padx=6)
 
@@ -694,7 +805,7 @@ ocr_chk = tk.Checkbutton(
     fg="white",
     selectcolor="#151515",
     activebackground="#090909",
-    activeforeground="white"
+    activeforeground="white",
 )
 ocr_chk.grid(row=0, column=2, padx=6)
 
@@ -707,7 +818,7 @@ mode_en = tk.Radiobutton(
     fg="white",
     selectcolor="#151515",
     activebackground="#090909",
-    activeforeground="white"
+    activeforeground="white",
 )
 mode_en.grid(row=1, column=0, padx=6)
 
@@ -720,7 +831,7 @@ mode_pt = tk.Radiobutton(
     fg="white",
     selectcolor="#151515",
     activebackground="#090909",
-    activeforeground="white"
+    activeforeground="white",
 )
 mode_pt.grid(row=1, column=1, padx=6)
 
@@ -729,7 +840,7 @@ hint = tk.Label(
     text="Enter=current | Ctrl+Enter=PT→EN | Shift+Enter=EN→PT | Esc=close",
     bg="#090909",
     fg="#7f7f7f",
-    font=("Arial", 8)
+    font=("Arial", 8),
 )
 hint.pack(anchor="w", pady=(0, 6))
 
@@ -738,7 +849,7 @@ saida_label = tk.Label(
     text="Output",
     bg="#090909",
     fg="#d0d0d0",
-    font=("Arial", 9, "bold")
+    font=("Arial", 9, "bold"),
 )
 saida_label.pack(anchor="w")
 
@@ -753,7 +864,7 @@ saida = tk.Text(
     highlightbackground="#203328",
     highlightcolor="#2f4a3a",
     padx=8,
-    pady=8
+    pady=8,
 )
 saida.pack(fill="both", expand=True, pady=(4, 6))
 
@@ -763,11 +874,11 @@ status = tk.Label(
     bg="#090909",
     fg="#8f8f8f",
     anchor="w",
-    font=("Arial", 8)
+    font=("Arial", 8),
 )
 status.pack(fill="x", pady=(2, 0))
 
-for widget in (btn_pt_en, btn_en_pt, btn_copy, btn_clear, save_nicks_btn):
+for widget in (btn_pt_en, btn_en_pt, btn_copy, btn_clear, save_nicks_btn, frases_btn_big):
     widget.bind("<Enter>", lambda e, w=widget: w.configure(bg="#2a2a2a"))
     widget.bind("<Leave>", lambda e, w=widget: w.configure(bg="#1d1d1d"))
 
