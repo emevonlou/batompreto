@@ -13,6 +13,8 @@ import mss
 from collections import deque
 from difflib import SequenceMatcher
 
+from batompreto.assets import load_quick_phrases
+
 lock_file = "/tmp/batompreto.lock"
 
 if os.path.exists(lock_file):
@@ -467,6 +469,10 @@ def on_close(event=None):
 
 root = tk.Tk()
 root.title("batompreto 🖤")
+
+quick_phrases = load_quick_phrases()
+print("Frases carregadas:", quick_phrases.keys())
+
 try:
     root.iconphoto(True, tk.PhotoImage(file=os.path.expanduser("~/batompreto/icon.png")))
 except Exception as e:
