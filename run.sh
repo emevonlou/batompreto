@@ -1,4 +1,8 @@
 #!/usr/bin/env bash
-cd /home/eme/batompreto || exit 1
+set -e
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+cd "$SCRIPT_DIR"
+
 rm -f /tmp/batompreto.lock
-python3 /home/eme/batompreto/app.py
+python3 app.py

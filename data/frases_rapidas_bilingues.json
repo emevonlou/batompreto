@@ -1,0 +1,26 @@
+{
+  "cumprimentos": [
+    { "pt": "Oi, cheguei agora.", "en": "Hey, I just got here." },
+    { "pt": "Bom jogo, gente.", "en": "Good game, everyone." },
+    { "pt": "Valeu por esperar.", "en": "Thanks for waiting." },
+    { "pt": "Bora começar.", "en": "Let's get started." }
+  ],
+  "emergencia": [
+    { "pt": "Espera um pouco, já volto.", "en": "Hang on a bit, I'll be right back." },
+    { "pt": "Meu jogo travou feio.", "en": "My game froze really badly." },
+    { "pt": "Deu lag aqui, um segundo.", "en": "I'm lagging here, give me a second." },
+    { "pt": "Caí da partida, já tento voltar.", "en": "I got kicked from the match, I'll try to get back." }
+  ],
+  "reacoes_rapidas": [
+    { "pt": "Boa, isso foi lindo.", "en": "Nice, that was clean." },
+    { "pt": "Socorro, deu tudo errado.", "en": "Help, everything went horribly wrong." },
+    { "pt": "Essa foi por pouco.", "en": "That was way too close." },
+    { "pt": "Agora foi de cinema.", "en": "Now that was cinematic." }
+  ],
+  "despedidas": [
+    { "pt": "Já volto mais tarde.", "en": "I'll be back later." },
+    { "pt": "Preciso sair agora, valeu.", "en": "I need to go now, thanks." },
+    { "pt": "Até depois, pessoal.", "en": "See you later, everyone." },
+    { "pt": "Foi divertido demais hoje.", "en": "That was way too fun today." }
+  ]
+}

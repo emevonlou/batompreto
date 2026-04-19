@@ -1,0 +1,902 @@
+import subprocess
+import tkinter as tk
+from tkinter import messagebox
+import os
+import sys
+import threading
+import time
+import re
+
+import pytesseract
+from PIL import Image, ImageOps, ImageFilter
+import mss
+from collections import deque
+from difflib import SequenceMatcher
+
+from batompreto.assets import load_quick_phrases
+
+lock_file = "/tmp/batompreto.lock"
+
+if os.path.exists(lock_file):
+    print("batompreto já está rodando 🖤")
+    sys.exit()
+
+with open(lock_file, "w") as f:
+    f.write(str(os.getpid()))
+
+# =========================
+# NICKS INICIAIS
+# =========================
+SEUS_NICKS_MINECRAFT = [
+    "nick1",
+    "nick2",
+]
+
+# =========================
+# OCR CONFIG
+# =========================
+chat_region = {
+    "top": 860,
+    "left": 1930,
+    "width": 620,
+    "height": 120,
+}
+
+ocr_interval_seconds = 0.45
+ocr_enabled_default = False
+tesseract_lang = "eng"
+
+ultimo_texto_ocr = ""
+MANUAL_SEND_COOLDOWN_SECONDS = 2.5
+SAFE_OUTPUT_MAX_CHARS = 140
+HISTORY_SIMILARITY_THRESHOLD = 0.88
+last_manual_copy_time = 0.0
+recent_manual_outputs = deque(maxlen=5)
+
+
+def play_sound():
+    os.system("paplay /usr/share/sounds/freedesktop/stereo/message.oga 2>/dev/null")
+
+
+def fade_in(alpha=0.0, target=0.78, step=0.05, delay=20):
+    if alpha < target:
+        root.attributes("-alpha", alpha)
+        root.after(delay, lambda: fade_in(alpha + step, target, step, delay))
+    else:
+        root.attributes("-alpha", target)
+
+
+def focus_input(event=None):
+    root.after(10, lambda: entrada.focus_force())
+
+
+def abrir_frases():
+    janela = tk.Toplevel(root)
+    janela.title("Frases rápidas 🖤")
+    janela.configure(bg="#090909")
+    janela.geometry("420x420")
+    janela.attributes("-topmost", True)
+
+    lista = tk.Listbox(
+        janela,
+        bg="#101914",
+        fg="#8fffc7",
+        selectbackground="#2f4a3a",
+        selectforeground="white",
+        relief="flat",
+        highlightthickness=1,
+        highlightbackground="#203328",
+        highlightcolor="#2f4a3a",
+    )
+    lista.pack(fill="both", expand=True, padx=8, pady=8)
+
+    itens = []
+
+    for categoria, frases in quick_phrases.items():
+        lista.insert(tk.END, f"── {categoria.upper()} ──")
+        itens.append(None)
+
+        for frase in frases:
+            texto = f'{frase["pt"]} | {frase["en"]}'
+            lista.insert(tk.END, texto)
+            itens.append(frase)
+
+    def inserir_frase(lang="en"):
+        selecao = lista.curselection()
+        if not selecao:
+            return
+
+        index = selecao[0]
+        frase = itens[index]
+
+        if frase is None:
+            return
+
+        entrada.delete("1.0", tk.END)
+        entrada.insert(tk.END, frase[lang])
+        status_var.set(f"Inserted ({lang.upper()})")
+        janela.lift()
+        focus_input()
+
+    def inserir_en(event=None):
+        inserir_frase("en")
+
+    def inserir_pt(event=None):
+        inserir_frase("pt")
+
+    lista.bind("<Double-Button-1>", inserir_en)
+    lista.bind("<Button-3>", inserir_pt)
+
+    dica = tk.Label(
+        janela,
+        text="Double click = EN | Right click = PT",
+        bg="#090909",
+        fg="#8f8f8f",
+        font=("Arial", 8),
+    )
+    dica.pack(pady=(0, 8))
+
+
+def animate_title():
+    global title_state
+    title_state = (title_state + 1) % 4
+    titles = [
+        "🐱💄 batompreto",
+        "🐈‍⬛💄 batompreto",
+        "🤍🐱💄 batompreto",
+        "🐱🖤 batompreto",
+    ]
+    title_label.config(text=titles[title_state])
+    root.after(1200, animate_title)
+
+
+def copiar_resultado():
+    texto = saida.get("1.0", tk.END).strip()
+    if not texto:
+        status_var.set("Nothing to copy.")
+        return
+
+    copiou, texto_final = copiar_para_area_de_transferencia(texto)
+
+    if texto_final:
+        mostrar_saida(texto_final)
+
+    if copiou:
+        status_var.set("Copied safe result.")
+        play_sound()
+    else:
+        status_var.set("Copy blocked or failed.")
+
+
+def get_target_lang():
+    return mode_var.get()
+
+
+def get_nicks_from_ui():
+    raw = nicks_entry.get().strip()
+    if not raw:
+        return []
+    return [n.strip() for n in raw.split(",") if n.strip()]
+
+
+def salvar_nicks():
+    global SEUS_NICKS_MINECRAFT
+    novos_nicks = get_nicks_from_ui()
+    SEUS_NICKS_MINECRAFT = novos_nicks
+    status_var.set(
+        f"Nicks saved: {', '.join(SEUS_NICKS_MINECRAFT) if SEUS_NICKS_MINECRAFT else 'none'}"
+    )
+    play_sound()
+
+
+def normalizar_texto_chat(texto):
+    texto = texto.strip()
+    texto = re.sub(r"\s+", " ", texto)
+    texto = re.sub(r"[!?]{2,}", "!", texto)
+    texto = re.sub(r"\.{2,}", ".", texto)
+    texto = re.sub(r"([,;:]){2,}", r"\1", texto)
+    return texto
+
+
+def similaridade_texto(a, b):
+    return SequenceMatcher(None, a.lower(), b.lower()).ratio()
+
+
+def preparar_texto_para_chat(texto):
+    texto = normalizar_texto_chat(texto)
+
+    if len(texto) < 2:
+        return None, "Text too short."
+
+    if len(texto) > SAFE_OUTPUT_MAX_CHARS:
+        texto = texto[:SAFE_OUTPUT_MAX_CHARS].rstrip()
+
+    return texto, None
+
+
+def pode_copiar_agora(texto):
+    global last_manual_copy_time
+
+    agora = time.time()
+    if agora - last_manual_copy_time < MANUAL_SEND_COOLDOWN_SECONDS:
+        faltando = MANUAL_SEND_COOLDOWN_SECONDS - (agora - last_manual_copy_time)
+        return False, f"Wait {faltando:.1f}s before copying again."
+
+    for anterior in recent_manual_outputs:
+        if similaridade_texto(texto, anterior) >= HISTORY_SIMILARITY_THRESHOLD:
+            return False, "Very similar message blocked to avoid spam."
+
+    last_manual_copy_time = agora
+    recent_manual_outputs.append(texto)
+    return True, None
+
+
+def copiar_para_area_de_transferencia(texto):
+    texto_pronto, erro = preparar_texto_para_chat(texto)
+    if erro:
+        status_var.set(erro)
+        return False, None
+
+    ok, motivo = pode_copiar_agora(texto_pronto)
+    if not ok:
+        status_var.set(motivo)
+        return False, texto_pronto
+
+    root.clipboard_clear()
+    root.clipboard_append(texto_pronto)
+    return True, texto_pronto
+
+
+def traduzir_texto(texto, destino):
+    result = subprocess.run(
+        ["crow", "-i", "-b", "-t", destino],
+        input=texto,
+        text=True,
+        capture_output=True,
+    )
+    traducao = result.stdout.strip()
+    erro = result.stderr.strip()
+    return traducao, erro
+
+
+def mostrar_saida(texto):
+    saida.config(state="normal")
+    saida.delete("1.0", tk.END)
+    saida.insert("1.0", texto)
+    saida.see("1.0")
+
+
+def traduzir(destino):
+    try:
+        texto = entrada.get("1.0", tk.END).strip()
+        if not texto:
+            status_var.set("Digite algo primeiro.")
+            return
+
+        traducao = traduzir_texto(texto, destino)
+
+        if isinstance(traducao, tuple):
+            traducao = traducao[0]
+
+        if traducao.startswith("Erro") or traducao.startswith("Error"):
+            status_var.set(traducao)
+            return
+
+        texto_chat, erro_chat = preparar_texto_para_chat(traducao)
+        if erro_chat:
+            status_var.set(erro_chat)
+            return
+
+        traducao = texto_chat
+        mostrar_saida(traducao)
+
+        if auto_copy_var.get():
+            copiou, texto_final = copiar_para_area_de_transferencia(traducao)
+
+            if texto_final:
+                traducao = texto_final
+                mostrar_saida(traducao)
+
+            if not copiou:
+                focus_input()
+                return
+
+        if destino == "en":
+            status_var.set("Translated to English.")
+        else:
+            status_var.set("Traduzido para português.")
+
+        play_sound()
+        focus_input()
+
+    except Exception as e:
+        messagebox.showerror("batompreto", str(e))
+        status_var.set("Unexpected error.")
+
+
+def traduz_pt_en():
+    mode_var.set("en")
+    traduzir("en")
+
+
+def traduz_en_pt():
+    mode_var.set("pt")
+    traduzir("pt")
+
+
+def traduzir_modo_atual(event=None):
+    traduzir(get_target_lang())
+    return "break"
+
+
+def traduzir_pt_en_atalho(event=None):
+    traduzir("en")
+    return "break"
+
+
+def traduzir_en_pt_atalho(event=None):
+    traduzir("pt")
+    return "break"
+
+
+def limpar_tudo():
+    entrada.delete("1.0", tk.END)
+    saida.config(state="normal")
+    saida.delete("1.0", tk.END)
+    status_var.set("Cleared.")
+    focus_input()
+
+
+def alternar_topo():
+    root.attributes("-topmost", topmost_var.get())
+    if topmost_var.get():
+        status_var.set("Always on top enabled.")
+    else:
+        status_var.set("Always on top disabled.")
+    focus_input()
+
+
+def iniciar_movimento(event):
+    root._drag_start_x = event.x
+    root._drag_start_y = event.y
+
+
+def mover_janela(event):
+    x = event.x_root - root._drag_start_x
+    y = event.y_root - root._drag_start_y
+    root.geometry(f"+{x}+{y}")
+
+
+def preprocess_for_ocr(img):
+    img = ImageOps.grayscale(img)
+    img = img.point(lambda p: 255 if p > 150 else 0)
+    img = img.resize((img.width * 2, img.height * 2))
+    img = img.filter(ImageFilter.SHARPEN)
+    return img
+
+
+def capturar_chat():
+    with mss.mss() as sct:
+        screenshot = sct.grab(chat_region)
+        img = Image.frombytes("RGB", screenshot.size, screenshot.rgb)
+        img = preprocess_for_ocr(img)
+        config = "--psm 6 -c preserve_interword_spaces=1"
+        texto = pytesseract.image_to_string(img, lang=tesseract_lang, config=config)
+        return texto.strip()
+
+
+def limpar_texto_ocr(texto):
+    linhas = []
+    lixo = [
+        "while",
+        "true",
+        "hacknet",
+        "arraste",
+        "duas vezes",
+        "auto ocr",
+        "copy",
+        "clear",
+        "input",
+        "output",
+        "batompreto",
+        "www.hypixel.net",
+        "skyblock",
+        "bed wars",
+        "duels",
+        "coins",
+        "lobby",
+        "prototype",
+        "click here",
+        "right click",
+    ]
+
+    for linha in texto.splitlines():
+        linha_limpa = linha.strip()
+        if not linha_limpa or len(linha_limpa) < 3:
+            continue
+        if all(ch in "-_=|/\\[](){}<>.:;,'`~" for ch in linha_limpa):
+            continue
+        if any(p in linha_limpa.lower() for p in lixo):
+            continue
+        linhas.append(linha_limpa)
+
+    return "\n".join(linhas[-2:]).strip()
+
+
+def extrair_mensagem_relevante(texto):
+    linhas = [linha.strip() for linha in texto.splitlines() if linha.strip()]
+    if not linhas:
+        return None
+
+    nicks_atuais = get_nicks_from_ui()
+
+    padroes = [
+        r"from\s+[^:]+:\s*(.+)",
+        r"to\s+[^:]+:\s*(.+)",
+        r"party\s*>\s*[^:]+:\s*(.+)",
+        r"guild\s*>\s*[^:]+:\s*(.+)",
+        r"officer\s*>\s*[^:]+:\s*(.+)",
+    ]
+
+    for linha in linhas:
+        for padrao in padroes:
+            m = re.search(padrao, linha, re.IGNORECASE)
+            if m:
+                msg = m.group(1).strip()
+                if msg:
+                    return msg
+
+    for linha in linhas:
+        linha_lower = linha.lower()
+        if any(nick.lower() in linha_lower for nick in nicks_atuais):
+            return linha
+
+    palavras = [
+        "/msg",
+        "/tell",
+        "/w",
+        "/pc",
+        "/party",
+        "/gc",
+        "party >",
+        "guild >",
+        "from ",
+        "to ",
+    ]
+
+    for linha in linhas:
+        ll = linha.lower()
+        if any(p in ll for p in palavras):
+            return linha
+
+    return None
+
+
+def atualizar_saida_threadsafe(texto):
+    root.after(0, lambda: mostrar_saida(texto))
+
+
+def atualizar_status_threadsafe(texto):
+    root.after(0, lambda: status_var.set(texto))
+
+
+def toggle_ocr():
+    if ocr_var.get():
+        status_var.set("Auto OCR ON 👁️")
+    else:
+        status_var.set("Auto OCR OFF")
+
+
+def loop_traducao_chat():
+    global ultimo_texto_ocr
+
+    while True:
+        try:
+            if not ocr_var.get():
+                time.sleep(0.3)
+                continue
+
+            texto = capturar_chat()
+            texto = limpar_texto_ocr(texto)
+
+            if not texto:
+                time.sleep(ocr_interval_seconds)
+                continue
+
+            importante = extrair_mensagem_relevante(texto)
+
+            if importante and importante != ultimo_texto_ocr:
+                ultimo_texto_ocr = importante
+                traducao, erro = traduzir_texto(importante, "pt")
+
+                if traducao:
+                    atualizar_saida_threadsafe(traducao)
+                    atualizar_status_threadsafe("Important chat translated 🐱")
+                    if auto_copy_var.get():
+                        root.after(
+                            0,
+                            lambda t=traducao: (
+                                root.clipboard_clear(),
+                                root.clipboard_append(t),
+                            ),
+                        )
+                    play_sound()
+
+        except Exception:
+            pass
+
+        time.sleep(ocr_interval_seconds)
+
+
+def on_close(event=None):
+    try:
+        if os.path.exists(lock_file):
+            os.remove(lock_file)
+    except Exception:
+        pass
+
+    try:
+        root.quit()
+    except Exception:
+        pass
+
+    try:
+        root.destroy()
+    except Exception:
+        pass
+
+    os._exit(0)
+
+
+root = tk.Tk()
+root.title("batompreto 🖤")
+
+quick_phrases = load_quick_phrases()
+
+try:
+    root.iconphoto(
+        True, tk.PhotoImage(file=os.path.expanduser("~/batompreto/icon.png"))
+    )
+except Exception as e:
+    print("Erro ao carregar ícone:", e)
+
+root.overrideredirect(False)
+root.after(50, lambda: root.overrideredirect(True))
+root.attributes("-topmost", True)
+root.attributes("-alpha", 0.78)
+root.configure(bg="#090909")
+root.geometry("480x560+3360+40")
+root.minsize(480, 560)
+
+topmost_var = tk.BooleanVar(value=True)
+auto_copy_var = tk.BooleanVar(value=True)
+ocr_var = tk.BooleanVar(value=ocr_enabled_default)
+mode_var = tk.StringVar(value="en")
+status_var = tk.StringVar(value="Ready 🖤")
+title_state = 0
+
+outer = tk.Frame(
+    root,
+    bg="#141414",
+    highlightthickness=1,
+    highlightbackground="#2d2d2d",
+)
+outer.pack(fill="both", expand=True)
+
+top_bar = tk.Frame(outer, bg="#101010", height=28)
+top_bar.pack(fill="x")
+top_bar.pack_propagate(False)
+
+top_bar.bind("<Button-1>", iniciar_movimento)
+top_bar.bind("<B1-Motion>", mover_janela)
+
+title_label = tk.Label(
+    top_bar,
+    text="🐱💄 batompreto",
+    bg="#101010",
+    fg="white",
+    font=("Arial", 10, "bold"),
+)
+title_label.pack(side="left", padx=8)
+title_label.bind("<Button-1>", iniciar_movimento)
+title_label.bind("<B1-Motion>", mover_janela)
+
+close_btn = tk.Button(
+    top_bar,
+    text="✕",
+    command=on_close,
+    bg="#101010",
+    fg="white",
+    activebackground="#a10028",
+    activeforeground="white",
+    relief="flat",
+    borderwidth=0,
+    padx=8,
+    pady=1,
+)
+close_btn.pack(side="right", padx=4)
+
+frases_top_btn = tk.Button(
+    top_bar,
+    text="⚡",
+    command=abrir_frases,
+    bg="#101010",
+    fg="white",
+    activebackground="#2b2b2b",
+    activeforeground="white",
+    relief="flat",
+    borderwidth=0,
+    padx=8,
+    pady=1,
+)
+frases_top_btn.pack(side="right", padx=2)
+
+body = tk.Frame(outer, bg="#090909")
+body.pack(fill="both", expand=True, padx=8, pady=8)
+
+frases_btn_big = tk.Button(
+    body,
+    text="⚡ Frases rápidas",
+    command=abrir_frases,
+    bg="#1d1d1d",
+    fg="white",
+    activebackground="#2b2b2b",
+    activeforeground="white",
+    relief="flat",
+    borderwidth=0,
+    padx=8,
+    pady=3,
+)
+frases_btn_big.pack(anchor="w", pady=(0, 6))
+
+nicks_label = tk.Label(
+    body,
+    text="Nicks (comma separated)",
+    bg="#090909",
+    fg="#d0d0d0",
+    font=("Arial", 9, "bold"),
+)
+nicks_label.pack(anchor="w")
+
+nicks_entry = tk.Entry(
+    body,
+    bg="#151515",
+    fg="#ffffff",
+    insertbackground="white",
+    relief="flat",
+)
+nicks_entry.pack(fill="x", pady=(4, 6))
+nicks_entry.insert(0, "")
+
+save_nicks_btn = tk.Button(
+    body,
+    text="Save Nicks",
+    command=salvar_nicks,
+    bg="#1d1d1d",
+    fg="white",
+    activebackground="#2b2b2b",
+    activeforeground="white",
+    relief="flat",
+    borderwidth=0,
+)
+save_nicks_btn.pack(anchor="w", pady=(0, 8))
+
+entrada_label = tk.Label(
+    body,
+    text="Input",
+    bg="#090909",
+    fg="#d0d0d0",
+    font=("Arial", 9, "bold"),
+)
+entrada_label.pack(anchor="w")
+
+entrada = tk.Text(
+    body,
+    height=4,
+    bg="#151515",
+    fg="#ffffff",
+    insertbackground="white",
+    relief="flat",
+    highlightthickness=1,
+    highlightbackground="#292929",
+    highlightcolor="#3a3a3a",
+    padx=8,
+    pady=8,
+)
+entrada.pack(fill="x", pady=(4, 6))
+entrada.bind("<Button-1>", focus_input)
+entrada.bind("<FocusIn>", lambda e: status_var.set("Typing..."))
+entrada.bind("<Return>", traduzir_modo_atual)
+entrada.bind("<Control-Return>", traduzir_pt_en_atalho)
+entrada.bind("<Shift-Return>", traduzir_en_pt_atalho)
+entrada.bind("<Escape>", on_close)
+
+btn_frame = tk.Frame(body, bg="#090909")
+btn_frame.pack(pady=(0, 6))
+
+btn_pt_en = tk.Button(
+    btn_frame,
+    text="PT→EN 💄",
+    command=traduz_pt_en,
+    bg="#1d1d1d",
+    fg="white",
+    activebackground="#2b2b2b",
+    activeforeground="white",
+    width=10,
+    relief="flat",
+    borderwidth=0,
+)
+btn_pt_en.grid(row=0, column=0, padx=3, pady=3)
+
+btn_en_pt = tk.Button(
+    btn_frame,
+    text="EN→PT 🐱",
+    command=traduz_en_pt,
+    bg="#1d1d1d",
+    fg="white",
+    activebackground="#2b2b2b",
+    activeforeground="white",
+    width=10,
+    relief="flat",
+    borderwidth=0,
+)
+btn_en_pt.grid(row=0, column=1, padx=3, pady=3)
+
+btn_copy = tk.Button(
+    btn_frame,
+    text="Copy",
+    command=copiar_resultado,
+    bg="#1d1d1d",
+    fg="white",
+    activebackground="#2b2b2b",
+    activeforeground="white",
+    width=10,
+    relief="flat",
+    borderwidth=0,
+)
+btn_copy.grid(row=0, column=2, padx=3, pady=3)
+
+btn_clear = tk.Button(
+    btn_frame,
+    text="Clear",
+    command=limpar_tudo,
+    bg="#1d1d1d",
+    fg="white",
+    activebackground="#2b2b2b",
+    activeforeground="white",
+    width=10,
+    relief="flat",
+    borderwidth=0,
+)
+btn_clear.grid(row=0, column=3, padx=3, pady=3)
+
+opts_frame = tk.Frame(body, bg="#090909")
+opts_frame.pack(pady=(0, 6))
+
+top_chk = tk.Checkbutton(
+    opts_frame,
+    text="Top",
+    variable=topmost_var,
+    command=alternar_topo,
+    bg="#090909",
+    fg="white",
+    selectcolor="#151515",
+    activebackground="#090909",
+    activeforeground="white",
+)
+top_chk.grid(row=0, column=0, padx=6)
+
+copy_chk = tk.Checkbutton(
+    opts_frame,
+    text="Auto copy",
+    variable=auto_copy_var,
+    bg="#090909",
+    fg="white",
+    selectcolor="#151515",
+    activebackground="#090909",
+    activeforeground="white",
+)
+copy_chk.grid(row=0, column=1, padx=6)
+
+ocr_chk = tk.Checkbutton(
+    opts_frame,
+    text="Auto OCR",
+    variable=ocr_var,
+    command=toggle_ocr,
+    bg="#090909",
+    fg="white",
+    selectcolor="#151515",
+    activebackground="#090909",
+    activeforeground="white",
+)
+ocr_chk.grid(row=0, column=2, padx=6)
+
+mode_en = tk.Radiobutton(
+    opts_frame,
+    text="PT→EN",
+    variable=mode_var,
+    value="en",
+    bg="#090909",
+    fg="white",
+    selectcolor="#151515",
+    activebackground="#090909",
+    activeforeground="white",
+)
+mode_en.grid(row=1, column=0, padx=6)
+
+mode_pt = tk.Radiobutton(
+    opts_frame,
+    text="EN→PT",
+    variable=mode_var,
+    value="pt",
+    bg="#090909",
+    fg="white",
+    selectcolor="#151515",
+    activebackground="#090909",
+    activeforeground="white",
+)
+mode_pt.grid(row=1, column=1, padx=6)
+
+hint = tk.Label(
+    body,
+    text="Enter=current | Ctrl+Enter=PT→EN | Shift+Enter=EN→PT | Esc=close",
+    bg="#090909",
+    fg="#7f7f7f",
+    font=("Arial", 8),
+)
+hint.pack(anchor="w", pady=(0, 6))
+
+saida_label = tk.Label(
+    body,
+    text="Output",
+    bg="#090909",
+    fg="#d0d0d0",
+    font=("Arial", 9, "bold"),
+)
+saida_label.pack(anchor="w")
+
+saida = tk.Text(
+    body,
+    height=8,
+    bg="#101914",
+    fg="#8fffc7",
+    insertbackground="white",
+    relief="flat",
+    highlightthickness=1,
+    highlightbackground="#203328",
+    highlightcolor="#2f4a3a",
+    padx=8,
+    pady=8,
+)
+saida.pack(fill="both", expand=True, pady=(4, 6))
+
+status = tk.Label(
+    body,
+    textvariable=status_var,
+    bg="#090909",
+    fg="#8f8f8f",
+    anchor="w",
+    font=("Arial", 8),
+)
+status.pack(fill="x", pady=(2, 0))
+
+for widget in (
+    btn_pt_en,
+    btn_en_pt,
+    btn_copy,
+    btn_clear,
+    save_nicks_btn,
+    frases_btn_big,
+):
+    widget.bind("<Enter>", lambda e, w=widget: w.configure(bg="#2a2a2a"))
+    widget.bind("<Leave>", lambda e, w=widget: w.configure(bg="#1d1d1d"))
+
+root.protocol("WM_DELETE_WINDOW", on_close)
+root.bind("<Escape>", on_close)
+root.after(200, focus_input)
+root.after(400, animate_title)
+fade_in()
+
+threading.Thread(target=loop_traducao_chat, daemon=True).start()
+
+root.mainloop()
