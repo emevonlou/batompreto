@@ -1,0 +1,17 @@
+{
+  "nicks": ["nick1", "nick2"],
+  "ocr_region": {
+    "top": 860,
+    "left": 1930,
+    "width": 620,
+    "height": 120
+  },
+  "ocr_interval_seconds": 0.45,
+  "ocr_enabled_default": false,
+  "tesseract_lang": "eng",
+  "manual_send_cooldown_seconds": 2.5,
+  "safe_output_max_chars": 140,
+  "history_similarity_threshold": 0.88,
+  "default_alpha": 0.78,
+  "default_geometry": "460x470+3360+40"
+}
