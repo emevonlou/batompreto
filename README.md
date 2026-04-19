@@ -23,13 +23,14 @@ Para uma experiência mais estável, é recomendado desativar essas funções du
 
 ## Features / Funcionalidades
 
-- Real-time OCR / OCR em tempo real  
-- AutoCopy (clipboard automático)  
-- Manual translation input / Tradução manual por texto  
-- PT-BR ↔ EN translation / Tradução PT-BR ↔ EN  
-- On-screen overlay for live communication / Sobreposição na tela para comunicação em tempo real  
-- Fast and lightweight / Rápido e leve  
-- Built for gaming and multitasking contexts / Pensado para jogos e multitarefa  
+- Real-time translation (Portuguese ↔ English) / Tradução em tempo real (Português ↔ Inglês)
+- Bilingual quick phrases system (Portuguese and English) / Sistema de frases rápidas bilíngue (Português e Inglês)
+- Double-click to insert English phrases / Duplo clique para inserir frases em inglês
+- Right-click to insert Portuguese phrases / Clique com botão direito para inserir frases em português
+- Smart clipboard system with anti-spam protection / Sistema inteligente de cópia com proteção anti-spam
+- OCR-based chat detection and translation / Detecção e tradução de chat via OCR
+- Always-on-top window for in-game usage / Janela sempre visível para uso em jogo
+- Lightweight and responsive interface / Interface leve e responsiva
 
 ---
 
