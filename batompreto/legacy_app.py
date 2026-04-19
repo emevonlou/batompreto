@@ -554,7 +554,9 @@ root.title("batompreto 🖤")
 quick_phrases = load_quick_phrases()
 
 try:
-    root.iconphoto(True, tk.PhotoImage(file=os.path.expanduser("~/batompreto/icon.png")))
+    root.iconphoto(
+        True, tk.PhotoImage(file=os.path.expanduser("~/batompreto/icon.png"))
+    )
 except Exception as e:
     print("Erro ao carregar ícone:", e)
 
@@ -878,7 +880,14 @@ status = tk.Label(
 )
 status.pack(fill="x", pady=(2, 0))
 
-for widget in (btn_pt_en, btn_en_pt, btn_copy, btn_clear, save_nicks_btn, frases_btn_big):
+for widget in (
+    btn_pt_en,
+    btn_en_pt,
+    btn_copy,
+    btn_clear,
+    save_nicks_btn,
+    frases_btn_big,
+):
     widget.bind("<Enter>", lambda e, w=widget: w.configure(bg="#2a2a2a"))
     widget.bind("<Leave>", lambda e, w=widget: w.configure(bg="#1d1d1d"))
 
