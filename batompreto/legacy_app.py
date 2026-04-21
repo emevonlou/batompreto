@@ -1,17 +1,17 @@
-import subprocess
-import tkinter as tk
-from tkinter import messagebox
 import os
+import re
+import subprocess
 import sys
 import threading
 import time
-import re
-
-import pytesseract
-from PIL import Image, ImageOps, ImageFilter
-import mss
+import tkinter as tk
 from collections import deque
 from difflib import SequenceMatcher
+from tkinter import messagebox
+
+import mss
+import pytesseract
+from PIL import Image, ImageFilter, ImageOps
 
 from batompreto.assets import load_quick_phrases
 
@@ -74,8 +74,11 @@ def abrir_frases():
     janela = tk.Toplevel(root)
     janela.title("Frases rápidas 🖤")
     janela.configure(bg="#090909")
-    janela.geometry("420x420")
+    janela.geometry("460x460")
     janela.attributes("-topmost", True)
+
+    categorias_frame = tk.Frame(janela, bg="#090909")
+    categorias_frame.pack(fill="x", padx=8, pady=(8, 4))
 
     lista = tk.Listbox(
         janela,
@@ -91,15 +94,20 @@ def abrir_frases():
     lista.pack(fill="both", expand=True, padx=8, pady=8)
 
     itens = []
+    categoria_atual = {"nome": None}
 
-    for categoria, frases in quick_phrases.items():
-        lista.insert(tk.END, f"── {categoria.upper()} ──")
-        itens.append(None)
+    def carregar_categoria(nome_categoria):
+        lista.delete(0, tk.END)
+        itens.clear()
+        categoria_atual["nome"] = nome_categoria
 
+        frases = quick_phrases.get(nome_categoria, [])
         for frase in frases:
             texto = f'{frase["pt"]} | {frase["en"]}'
             lista.insert(tk.END, texto)
             itens.append(frase)
+
+        status_var.set(f"Categoria carregada: {nome_categoria}")
 
     def inserir_frase(lang="en"):
         selecao = lista.curselection()
@@ -109,12 +117,9 @@ def abrir_frases():
         index = selecao[0]
         frase = itens[index]
 
-        if frase is None:
-            return
-
         entrada.delete("1.0", tk.END)
         entrada.insert(tk.END, frase[lang])
-        status_var.set(f"Inserted ({lang.upper()})")
+        status_var.set(f"Inserted ({lang.upper()}) from {categoria_atual['nome']}")
         janela.lift()
         focus_input()
 
@@ -123,6 +128,22 @@ def abrir_frases():
 
     def inserir_pt(event=None):
         inserir_frase("pt")
+
+    for idx, categoria in enumerate(quick_phrases.keys()):
+        btn_categoria = tk.Button(
+            categorias_frame,
+            text=categoria.replace("_", " ").title(),
+            command=lambda c=categoria: carregar_categoria(c),
+            bg="#1d1d1d",
+            fg="white",
+            activebackground="#2b2b2b",
+            activeforeground="white",
+            relief="flat",
+            borderwidth=0,
+            padx=8,
+            pady=4,
+        )
+        btn_categoria.grid(row=0, column=idx, padx=3, pady=2)
 
     lista.bind("<Double-Button-1>", inserir_en)
     lista.bind("<Button-3>", inserir_pt)
@@ -135,6 +156,10 @@ def abrir_frases():
         font=("Arial", 8),
     )
     dica.pack(pady=(0, 8))
+
+    primeiras_categorias = list(quick_phrases.keys())
+    if primeiras_categorias:
+        carregar_categoria(primeiras_categorias[0])
 
 
 def animate_title():
@@ -554,9 +579,7 @@ root.title("batompreto 🖤")
 quick_phrases = load_quick_phrases()
 
 try:
-    root.iconphoto(
-        True, tk.PhotoImage(file=os.path.expanduser("~/batompreto/icon.png"))
-    )
+    root.iconphoto(True, tk.PhotoImage(file=os.path.expanduser("~/batompreto/icon.png")))
 except Exception as e:
     print("Erro ao carregar ícone:", e)
 
@@ -880,14 +903,7 @@ status = tk.Label(
 )
 status.pack(fill="x", pady=(2, 0))
 
-for widget in (
-    btn_pt_en,
-    btn_en_pt,
-    btn_copy,
-    btn_clear,
-    save_nicks_btn,
-    frases_btn_big,
-):
+for widget in (btn_pt_en, btn_en_pt, btn_copy, btn_clear, save_nicks_btn, frases_btn_big):
     widget.bind("<Enter>", lambda e, w=widget: w.configure(bg="#2a2a2a"))
     widget.bind("<Leave>", lambda e, w=widget: w.configure(bg="#1d1d1d"))
 
