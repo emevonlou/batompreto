@@ -1,18 +1,11 @@
 import os
-import re
 import subprocess
 import sys
-import threading
-import time
 import tkinter as tk
-from collections import deque
-from difflib import SequenceMatcher
-from tkinter import messagebox
 
-import mss
-import pytesseract
-from PIL import Image, ImageFilter, ImageOps
-
+# =========================
+# LOCK
+# =========================
 lock_file = "/tmp/batompreto.lock"
 
 if os.path.exists(lock_file):
@@ -23,159 +16,26 @@ with open(lock_file, "w") as f:
     f.write(str(os.getpid()))
 
 # =========================
-# NICKS INICIAIS
+# CONFIG
 # =========================
-SEUS_NICKS_MINECRAFT = [
-    "nick1",
-    "nick2",
-]
+AUTO_TRANSLATE_DELAY_MS = 600
+auto_translate_after_id = None
+
 
 # =========================
-# OCR CONFIG
+# CORE
 # =========================
-chat_region = {
-    "top": 860,
-    "left": 1930,
-    "width": 620,
-    "height": 120,
-}
-
-ocr_interval_seconds = 0.45
-ocr_enabled_default = False
-tesseract_lang = "eng"
-
-ultimo_texto_ocr = ""
-MANUAL_SEND_COOLDOWN_SECONDS = 2.5
-SAFE_OUTPUT_MAX_CHARS = 140
-HISTORY_SIMILARITY_THRESHOLD = 0.88
-last_manual_copy_time = 0.0
-recent_manual_outputs = deque(maxlen=5)
-
-
-def play_sound():
-    os.system("paplay /usr/share/sounds/freedesktop/stereo/message.oga 2>/dev/null")
-
-
-def fade_in(alpha=0.0, target=0.82, step=0.05, delay=20):
-    if alpha < target:
-        root.attributes("-alpha", alpha)
-        root.after(delay, lambda: fade_in(alpha + step, target, step, delay))
-    else:
-        root.attributes("-alpha", target)
+def get_target_lang():
+    return mode_var.get()
 
 
 def focus_input(event=None):
     root.after(10, lambda: entrada.focus_force())
 
 
-def animate_title():
-    global title_state
-    title_state = (title_state + 1) % 4
-    titles = [
-        "batompreto",
-        "batompreto",
-        "batompreto",
-        "batompreto",
-    ]
-    title_label.config(text=titles[title_state])
-    root.after(1200, animate_title)
-
-
-def copiar_resultado():
-    texto = saida.get("1.0", tk.END).strip()
-    if not texto:
-        status_var.set("Nothing to copy.")
-        return
-
-    copiou, texto_final = copiar_para_area_de_transferencia(texto)
-
-    if texto_final:
-        mostrar_saida(texto_final)
-
-    if copiou:
-        status_var.set("Copied safe result.")
-        play_sound()
-    else:
-        status_var.set("Copy blocked or failed.")
-
-
-def get_target_lang():
-    return mode_var.get()
-
-
-def get_nicks_from_ui():
-    raw = nicks_entry.get().strip()
-    if not raw:
-        return []
-    return [n.strip() for n in raw.split(",") if n.strip()]
-
-
-def salvar_nicks():
-    global SEUS_NICKS_MINECRAFT
-    novos_nicks = get_nicks_from_ui()
-    SEUS_NICKS_MINECRAFT = novos_nicks
-    status_var.set(
-        f"Nicks saved: {', '.join(SEUS_NICKS_MINECRAFT) if SEUS_NICKS_MINECRAFT else 'none'}"
-    )
-    play_sound()
-
-
-def normalizar_texto_chat(texto):
-    texto = texto.strip()
-    texto = re.sub(r"\s+", " ", texto)
-    texto = re.sub(r"[!?]{2,}", "!", texto)
-    texto = re.sub(r"\.{2,}", ".", texto)
-    texto = re.sub(r"([,;:]){2,}", r"\1", texto)
-    return texto
-
-
-def similaridade_texto(a, b):
-    return SequenceMatcher(None, a.lower(), b.lower()).ratio()
-
-
-def preparar_texto_para_chat(texto):
-    texto = normalizar_texto_chat(texto)
-
-    if len(texto) < 2:
-        return None, "Text too short."
-
-    if len(texto) > SAFE_OUTPUT_MAX_CHARS:
-        texto = texto[:SAFE_OUTPUT_MAX_CHARS].rstrip()
-
-    return texto, None
-
-
-def pode_copiar_agora(texto):
-    global last_manual_copy_time
-
-    agora = time.time()
-    if agora - last_manual_copy_time < MANUAL_SEND_COOLDOWN_SECONDS:
-        faltando = MANUAL_SEND_COOLDOWN_SECONDS - (agora - last_manual_copy_time)
-        return False, f"Wait {faltando:.1f}s before copying again."
-
-    for anterior in recent_manual_outputs:
-        if similaridade_texto(texto, anterior) >= HISTORY_SIMILARITY_THRESHOLD:
-            return False, "Very similar message blocked to avoid spam."
-
-    last_manual_copy_time = agora
-    recent_manual_outputs.append(texto)
-    return True, None
-
-
-def copiar_para_area_de_transferencia(texto):
-    texto_pronto, erro = preparar_texto_para_chat(texto)
-    if erro:
-        status_var.set(erro)
-        return False, None
-
-    ok, motivo = pode_copiar_agora(texto_pronto)
-    if not ok:
-        status_var.set(motivo)
-        return False, texto_pronto
-
-    root.clipboard_clear()
-    root.clipboard_append(texto_pronto)
-    return True, texto_pronto
+def mostrar_saida(texto):
+    saida.delete("1.0", tk.END)
+    saida.insert("1.0", texto)
 
 
 def traduzir_texto(texto, destino):
@@ -185,64 +45,81 @@ def traduzir_texto(texto, destino):
         text=True,
         capture_output=True,
     )
+
     traducao = result.stdout.strip()
     erro = result.stderr.strip()
-    return traducao, erro
+
+    if erro and not traducao:
+        return f"Error: {erro}"
+
+    return traducao
 
 
-def mostrar_saida(texto):
-    saida.config(state="normal")
-    saida.delete("1.0", tk.END)
-    saida.insert("1.0", texto)
-    saida.see("1.0")
+def fade_in(alpha=0.0, target=0.78, step=0.05, delay=20):
+    if alpha < target:
+        root.attributes("-alpha", alpha)
+        root.after(delay, lambda: fade_in(alpha + step, target, step, delay))
+    else:
+        root.attributes("-alpha", target)
 
 
+# =========================
+# LIVE TRANSLATE
+# =========================
+def agendar_traducao(event=None):
+    global auto_translate_after_id
+
+    if event is not None and event.keysym in (
+        "Return",
+        "Shift_L",
+        "Shift_R",
+        "Control_L",
+        "Control_R",
+    ):
+        return
+
+    if auto_translate_after_id is not None:
+        root.after_cancel(auto_translate_after_id)
+
+    auto_translate_after_id = root.after(
+        AUTO_TRANSLATE_DELAY_MS,
+        executar_traducao_live,
+    )
+
+
+def executar_traducao_live():
+    global auto_translate_after_id
+    auto_translate_after_id = None
+
+    texto = entrada.get("1.0", tk.END).strip()
+    if len(texto) < 2:
+        saida.delete("1.0", tk.END)
+        status_var.set("Ready")
+        return
+
+    traducao = traduzir_texto(texto, get_target_lang())
+    mostrar_saida(traducao)
+    status_var.set(f"Live translate: {get_target_lang().upper()}")
+
+
+# =========================
+# TRADUÇÃO MANUAL
+# =========================
 def traduzir(destino):
-    try:
-        texto = entrada.get("1.0", tk.END).strip()
-        if not texto:
-            status_var.set("Digite algo primeiro.")
-            return
+    texto = entrada.get("1.0", tk.END).strip()
+    if not texto:
+        status_var.set("Digite algo primeiro.")
+        return
 
-        traducao = traduzir_texto(texto, destino)
+    traducao = traduzir_texto(texto, destino)
+    mostrar_saida(traducao)
 
-        if isinstance(traducao, tuple):
-            traducao = traducao[0]
+    if destino == "en":
+        status_var.set("Translated to English.")
+    else:
+        status_var.set("Traduzido para português.")
 
-        if traducao.startswith("Erro") or traducao.startswith("Error"):
-            status_var.set(traducao)
-            return
-
-        texto_chat, erro_chat = preparar_texto_para_chat(traducao)
-        if erro_chat:
-            status_var.set(erro_chat)
-            return
-
-        traducao = texto_chat
-        mostrar_saida(traducao)
-
-        if auto_copy_var.get():
-            copiou, texto_final = copiar_para_area_de_transferencia(traducao)
-
-            if texto_final:
-                traducao = texto_final
-                mostrar_saida(traducao)
-
-            if not copiou:
-                focus_input()
-                return
-
-        if destino == "en":
-            status_var.set("Translated to English.")
-        else:
-            status_var.set("Traduzido para português.")
-
-        play_sound()
-        focus_input()
-
-    except Exception as e:
-        messagebox.showerror("batompreto", str(e))
-        status_var.set("Unexpected error.")
+    focus_input()
 
 
 def traduz_pt_en():
@@ -270,20 +147,33 @@ def traduzir_en_pt_atalho(event=None):
     return "break"
 
 
+# =========================
+# ACTIONS
+# =========================
+def copiar_resultado():
+    texto = saida.get("1.0", tk.END).strip()
+    if not texto:
+        status_var.set("Nothing to copy.")
+        return
+
+    root.clipboard_clear()
+    root.clipboard_append(texto)
+    status_var.set("Copied.")
+
+
 def limpar_tudo():
+    global auto_translate_after_id
+
+    if auto_translate_after_id is not None:
+        try:
+            root.after_cancel(auto_translate_after_id)
+        except Exception:
+            pass
+        auto_translate_after_id = None
+
     entrada.delete("1.0", tk.END)
-    saida.config(state="normal")
     saida.delete("1.0", tk.END)
     status_var.set("Cleared.")
-    focus_input()
-
-
-def alternar_topo():
-    root.attributes("-topmost", topmost_var.get())
-    if topmost_var.get():
-        status_var.set("Always on top enabled.")
-    else:
-        status_var.set("Always on top disabled.")
     focus_input()
 
 
@@ -296,167 +186,6 @@ def mover_janela(event):
     x = event.x_root - root._drag_start_x
     y = event.y_root - root._drag_start_y
     root.geometry(f"+{x}+{y}")
-
-
-def preprocess_for_ocr(img):
-    img = ImageOps.grayscale(img)
-    img = img.point(lambda p: 255 if p > 150 else 0)
-    img = img.resize((img.width * 2, img.height * 2))
-    img = img.filter(ImageFilter.SHARPEN)
-    return img
-
-
-def capturar_chat():
-    with mss.mss() as sct:
-        screenshot = sct.grab(chat_region)
-        img = Image.frombytes("RGB", screenshot.size, screenshot.rgb)
-        img = preprocess_for_ocr(img)
-        config = "--psm 6 -c preserve_interword_spaces=1"
-        texto = pytesseract.image_to_string(img, lang=tesseract_lang, config=config)
-        return texto.strip()
-
-
-def limpar_texto_ocr(texto):
-    linhas = []
-    lixo = [
-        "while",
-        "true",
-        "hacknet",
-        "arraste",
-        "duas vezes",
-        "auto ocr",
-        "copy",
-        "clear",
-        "input",
-        "output",
-        "batompreto",
-        "www.hypixel.net",
-        "skyblock",
-        "bed wars",
-        "duels",
-        "coins",
-        "lobby",
-        "prototype",
-        "click here",
-        "right click",
-    ]
-
-    for linha in texto.splitlines():
-        linha_limpa = linha.strip()
-        if not linha_limpa or len(linha_limpa) < 3:
-            continue
-        if all(ch in "-_=|/\\[](){}<>.:;,'`~" for ch in linha_limpa):
-            continue
-        if any(p in linha_limpa.lower() for p in lixo):
-            continue
-        linhas.append(linha_limpa)
-
-    return "\n".join(linhas[-2:]).strip()
-
-
-def extrair_mensagem_relevante(texto):
-    linhas = [linha.strip() for linha in texto.splitlines() if linha.strip()]
-    if not linhas:
-        return None
-
-    nicks_atuais = get_nicks_from_ui()
-
-    padroes = [
-        r"from\s+[^:]+:\s*(.+)",
-        r"to\s+[^:]+:\s*(.+)",
-        r"party\s*>\s*[^:]+:\s*(.+)",
-        r"guild\s*>\s*[^:]+:\s*(.+)",
-        r"officer\s*>\s*[^:]+:\s*(.+)",
-    ]
-
-    for linha in linhas:
-        for padrao in padroes:
-            m = re.search(padrao, linha, re.IGNORECASE)
-            if m:
-                msg = m.group(1).strip()
-                if msg:
-                    return msg
-
-    for linha in linhas:
-        linha_lower = linha.lower()
-        if any(nick.lower() in linha_lower for nick in nicks_atuais):
-            return linha
-
-    palavras = [
-        "/msg",
-        "/tell",
-        "/w",
-        "/pc",
-        "/party",
-        "/gc",
-        "party >",
-        "guild >",
-        "from ",
-        "to ",
-    ]
-
-    for linha in linhas:
-        ll = linha.lower()
-        if any(p in ll for p in palavras):
-            return linha
-
-    return None
-
-
-def atualizar_saida_threadsafe(texto):
-    root.after(0, lambda: mostrar_saida(texto))
-
-
-def atualizar_status_threadsafe(texto):
-    root.after(0, lambda: status_var.set(texto))
-
-
-def toggle_ocr():
-    if ocr_var.get():
-        status_var.set("Auto OCR ON")
-    else:
-        status_var.set("Auto OCR OFF")
-
-
-def loop_traducao_chat():
-    global ultimo_texto_ocr
-
-    while True:
-        try:
-            if not ocr_var.get():
-                time.sleep(0.3)
-                continue
-
-            texto = capturar_chat()
-            texto = limpar_texto_ocr(texto)
-
-            if not texto:
-                time.sleep(ocr_interval_seconds)
-                continue
-
-            importante = extrair_mensagem_relevante(texto)
-
-            if importante and importante != ultimo_texto_ocr:
-                ultimo_texto_ocr = importante
-                traducao, erro = traduzir_texto(importante, "pt")
-
-                if traducao:
-                    atualizar_saida_threadsafe(traducao)
-                    atualizar_status_threadsafe("Important chat translated")
-                    if auto_copy_var.get():
-                        root.after(
-                            0,
-                            lambda t=traducao: (
-                                root.clipboard_clear(),
-                                root.clipboard_append(t),
-                            ),
-                        )
-                    play_sound()
-
-        except Exception:
-            pass
-
-        time.sleep(ocr_interval_seconds)
 
 
 def on_close(event=None):
@@ -479,22 +208,31 @@ def on_close(event=None):
     os._exit(0)
 
 
+# =========================
+# UI
+# =========================
 root = tk.Tk()
 root.title("batompreto")
-root.attributes("-alpha", 0.82)
+
+try:
+    root.iconphoto(
+        True,
+        tk.PhotoImage(file=os.path.expanduser("~/github-projects/batompreto/icon.png")),
+    )
+except Exception as e:
+    print("Erro ao carregar ícone:", e)
+
+# Modelo de transparência da versão antiga
 root.overrideredirect(False)
 root.after(50, lambda: root.overrideredirect(True))
 root.attributes("-topmost", True)
+root.attributes("-alpha", 0.0)
 root.configure(bg="#090909")
-root.geometry("480x560+3360+40")
-root.minsize(480, 560)
+root.geometry("470x310+3360+40")
+root.minsize(450, 295)
 
-topmost_var = tk.BooleanVar(value=True)
-auto_copy_var = tk.BooleanVar(value=True)
-ocr_var = tk.BooleanVar(value=ocr_enabled_default)
 mode_var = tk.StringVar(value="en")
 status_var = tk.StringVar(value="Ready")
-title_state = 0
 
 outer = tk.Frame(
     root,
@@ -504,7 +242,7 @@ outer = tk.Frame(
 )
 outer.pack(fill="both", expand=True)
 
-top_bar = tk.Frame(outer, bg="#101010", height=28)
+top_bar = tk.Frame(outer, bg="#101010", height=26)
 top_bar.pack(fill="x")
 top_bar.pack_propagate(False)
 
@@ -515,7 +253,7 @@ title_label = tk.Label(
     top_bar,
     text="batompreto",
     bg="#101010",
-    fg="white",
+    fg="#d8d8d8",
     font=("Arial", 10, "bold"),
 )
 title_label.pack(side="left", padx=8)
@@ -527,51 +265,20 @@ close_btn = tk.Button(
     text="✕",
     command=on_close,
     bg="#101010",
-    fg="white",
-    activebackground="#a10028",
+    fg="#d8d8d8",
+    activebackground="#8d1f1f",
     activeforeground="white",
     relief="flat",
     borderwidth=0,
     padx=8,
     pady=1,
 )
-close_btn.pack(side="right", padx=4)
+close_btn.pack(side="right", padx=2)
 
 body = tk.Frame(outer, bg="#090909")
-body.pack(fill="both", expand=True, padx=8, pady=8)
+body.pack(fill="both", expand=True, padx=6, pady=6)
 
-nicks_label = tk.Label(
-    body,
-    text="Nicks (comma separated)",
-    bg="#090909",
-    fg="#d0d0d0",
-    font=("Arial", 9, "bold"),
-)
-nicks_label.pack(anchor="w")
-
-nicks_entry = tk.Entry(
-    body,
-    bg="#151515",
-    fg="#ffffff",
-    insertbackground="white",
-    relief="flat",
-)
-nicks_entry.pack(fill="x", pady=(4, 6))
-nicks_entry.insert(0, "")
-
-save_nicks_btn = tk.Button(
-    body,
-    text="Save Nicks",
-    command=salvar_nicks,
-    bg="#1d1d1d",
-    fg="white",
-    activebackground="#2b2b2b",
-    activeforeground="white",
-    relief="flat",
-    borderwidth=0,
-)
-save_nicks_btn.pack(anchor="w", pady=(0, 8))
-
+# INPUT
 entrada_label = tk.Label(
     body,
     text="Input",
@@ -583,127 +290,33 @@ entrada_label.pack(anchor="w")
 
 entrada = tk.Text(
     body,
-    height=4,
-    bg="#151515",
+    height=3,
+    bg="#111111",
     fg="#ffffff",
     insertbackground="white",
     relief="flat",
     highlightthickness=1,
-    highlightbackground="#292929",
+    highlightbackground="#2b2b2b",
     highlightcolor="#3a3a3a",
-    padx=8,
-    pady=8,
+    padx=6,
+    pady=6,
 )
-entrada.pack(fill="x", pady=(4, 6))
+entrada.pack(fill="x", pady=(3, 5))
+
 entrada.bind("<Button-1>", focus_input)
 entrada.bind("<FocusIn>", lambda e: status_var.set("Typing..."))
+entrada.bind("<KeyRelease>", agendar_traducao)
 entrada.bind("<Return>", traduzir_modo_atual)
 entrada.bind("<Control-Return>", traduzir_pt_en_atalho)
 entrada.bind("<Shift-Return>", traduzir_en_pt_atalho)
 entrada.bind("<Escape>", on_close)
 
-btn_frame = tk.Frame(body, bg="#090909")
-btn_frame.pack(pady=(0, 6))
-
-btn_pt_en = tk.Button(
-    btn_frame,
-    text="PT→EN",
-    command=traduz_pt_en,
-    bg="#1d1d1d",
-    fg="white",
-    activebackground="#2b2b2b",
-    activeforeground="white",
-    width=10,
-    relief="flat",
-    borderwidth=0,
-)
-btn_pt_en.grid(row=0, column=0, padx=3, pady=3)
-
-btn_en_pt = tk.Button(
-    btn_frame,
-    text="EN→PT",
-    command=traduz_en_pt,
-    bg="#1d1d1d",
-    fg="white",
-    activebackground="#2b2b2b",
-    activeforeground="white",
-    width=10,
-    relief="flat",
-    borderwidth=0,
-)
-btn_en_pt.grid(row=0, column=1, padx=3, pady=3)
-
-btn_copy = tk.Button(
-    btn_frame,
-    text="Copy",
-    command=copiar_resultado,
-    bg="#1d1d1d",
-    fg="white",
-    activebackground="#2b2b2b",
-    activeforeground="white",
-    width=10,
-    relief="flat",
-    borderwidth=0,
-)
-btn_copy.grid(row=0, column=2, padx=3, pady=3)
-
-btn_clear = tk.Button(
-    btn_frame,
-    text="Clear",
-    command=limpar_tudo,
-    bg="#1d1d1d",
-    fg="white",
-    activebackground="#2b2b2b",
-    activeforeground="white",
-    width=10,
-    relief="flat",
-    borderwidth=0,
-)
-btn_clear.grid(row=0, column=3, padx=3, pady=3)
-
-opts_frame = tk.Frame(body, bg="#090909")
-opts_frame.pack(pady=(0, 6))
-
-top_chk = tk.Checkbutton(
-    opts_frame,
-    text="Top",
-    variable=topmost_var,
-    command=alternar_topo,
-    bg="#090909",
-    fg="white",
-    selectcolor="#151515",
-    activebackground="#090909",
-    activeforeground="white",
-)
-top_chk.grid(row=0, column=0, padx=6)
-
-copy_chk = tk.Checkbutton(
-    opts_frame,
-    text="Auto copy",
-    variable=auto_copy_var,
-    bg="#090909",
-    fg="white",
-    selectcolor="#151515",
-    activebackground="#090909",
-    activeforeground="white",
-)
-copy_chk.grid(row=0, column=1, padx=6)
-
-ocr_chk = tk.Checkbutton(
-    opts_frame,
-    text="Auto OCR",
-    variable=ocr_var,
-    command=toggle_ocr,
-    bg="#090909",
-    fg="white",
-    selectcolor="#151515",
-    activebackground="#090909",
-    activeforeground="white",
-)
-ocr_chk.grid(row=0, column=2, padx=6)
+# MODE
+mode_frame = tk.Frame(body, bg="#090909")
+mode_frame.pack(anchor="w", pady=(0, 4))
 
 mode_en = tk.Radiobutton(
-    opts_frame,
+    mode_frame,
     text="PT→EN",
     variable=mode_var,
     value="en",
@@ -713,10 +326,10 @@ mode_en = tk.Radiobutton(
     activebackground="#090909",
     activeforeground="white",
 )
-mode_en.grid(row=1, column=0, padx=6)
+mode_en.grid(row=0, column=0, padx=(0, 6))
 
 mode_pt = tk.Radiobutton(
-    opts_frame,
+    mode_frame,
     text="EN→PT",
     variable=mode_var,
     value="pt",
@@ -726,17 +339,80 @@ mode_pt = tk.Radiobutton(
     activebackground="#090909",
     activeforeground="white",
 )
-mode_pt.grid(row=1, column=1, padx=6)
+mode_pt.grid(row=0, column=1, padx=(0, 6))
+
+# BUTTONS
+btn_frame = tk.Frame(body, bg="#090909")
+btn_frame.pack(fill="x", pady=(0, 4))
+
+btn_pt_en = tk.Button(
+    btn_frame,
+    text="PT→EN",
+    command=traduz_pt_en,
+    bg="#1a1a1a",
+    fg="white",
+    activebackground="#2c2c2c",
+    activeforeground="white",
+    width=10,
+    relief="flat",
+    borderwidth=0,
+)
+btn_pt_en.grid(row=0, column=0, padx=2, pady=2)
+
+btn_en_pt = tk.Button(
+    btn_frame,
+    text="EN→PT",
+    command=traduz_en_pt,
+    bg="#1a1a1a",
+    fg="white",
+    activebackground="#2c2c2c",
+    activeforeground="white",
+    width=10,
+    relief="flat",
+    borderwidth=0,
+)
+btn_en_pt.grid(row=0, column=1, padx=2, pady=2)
+
+btn_copy = tk.Button(
+    btn_frame,
+    text="Copy",
+    command=copiar_resultado,
+    bg="#1a1a1a",
+    fg="white",
+    activebackground="#2c2c2c",
+    activeforeground="white",
+    width=10,
+    relief="flat",
+    borderwidth=0,
+)
+btn_copy.grid(row=0, column=2, padx=2, pady=2)
+
+btn_clear = tk.Button(
+    btn_frame,
+    text="Clear",
+    command=limpar_tudo,
+    bg="#1a1a1a",
+    fg="white",
+    activebackground="#2c2c2c",
+    activeforeground="white",
+    width=10,
+    relief="flat",
+    borderwidth=0,
+)
+btn_clear.grid(row=0, column=3, padx=2, pady=2)
 
 hint = tk.Label(
     body,
-    text="Enter=current | Ctrl+Enter=PT→EN | Shift+Enter=EN→PT | Esc=close",
+    text="Live translate | Enter=current mode | Ctrl+Enter=PT→EN | Shift+Enter=EN→PT | Esc=close",
     bg="#090909",
-    fg="#7f7f7f",
-    font=("Arial", 8),
+    fg="#7a7a7a",
+    font=("Arial", 7),
+    wraplength=440,
+    justify="left",
 )
-hint.pack(anchor="w", pady=(0, 6))
+hint.pack(anchor="w", pady=(0, 4))
 
+# OUTPUT
 saida_label = tk.Label(
     body,
     text="Output",
@@ -748,39 +424,39 @@ saida_label.pack(anchor="w")
 
 saida = tk.Text(
     body,
-    height=5,
-    bg="#101914",
-    fg="#8fffc7",
+    height=3,
+    bg="#081710",
+    fg="#9cffc7",
     insertbackground="white",
     relief="flat",
     highlightthickness=1,
-    highlightbackground="#203328",
-    highlightcolor="#2f4a3a",
-    padx=8,
-    pady=8,
+    highlightbackground="#193126",
+    highlightcolor="#244636",
+    padx=6,
+    pady=6,
 )
-saida.pack(fill="both", expand=True, pady=(4, 6))
+saida.pack(fill="x", pady=(3, 4))
 
 status = tk.Label(
     body,
     textvariable=status_var,
     bg="#090909",
-    fg="#8f8f8f",
+    fg="#8a8a8a",
     anchor="w",
     font=("Arial", 8),
 )
-status.pack(fill="x", pady=(2, 0))
+status.pack(fill="x", pady=(1, 0))
 
-for widget in (btn_pt_en, btn_en_pt, btn_copy, btn_clear, save_nicks_btn):
+for widget in (btn_pt_en, btn_en_pt, btn_copy, btn_clear):
     widget.bind("<Enter>", lambda e, w=widget: w.configure(bg="#2a2a2a"))
-    widget.bind("<Leave>", lambda e, w=widget: w.configure(bg="#1d1d1d"))
+    widget.bind("<Leave>", lambda e, w=widget: w.configure(bg="#1a1a1a"))
+
+close_btn.bind("<Enter>", lambda e: close_btn.configure(bg="#8d1f1f"))
+close_btn.bind("<Leave>", lambda e: close_btn.configure(bg="#101010"))
 
 root.protocol("WM_DELETE_WINDOW", on_close)
 root.bind("<Escape>", on_close)
-root.after(200, focus_input)
-root.after(400, animate_title)
-fade_in()
-
-threading.Thread(target=loop_traducao_chat, daemon=True).start()
+root.after(120, focus_input)
+root.after(180, lambda: fade_in(target=0.78))
 
 root.mainloop()
