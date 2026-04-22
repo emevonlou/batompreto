@@ -13,7 +13,6 @@ import mss
 import pytesseract
 from PIL import Image, ImageFilter, ImageOps
 
-
 lock_file = "/tmp/batompreto.lock"
 
 if os.path.exists(lock_file):
