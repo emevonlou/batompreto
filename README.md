@@ -83,7 +83,7 @@ Se não funcionar no seu sistema, utilize a versão RPM.
 
 ---
 
-About / Sobre
+## About / Sobre
 
 BatomPreto is currently under active development.
 BatomPreto está atualmente em fase de desenvolvimento.
