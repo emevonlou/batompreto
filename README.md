@@ -87,8 +87,10 @@ About / Sobre
 
 BatomPreto is currently under active development.
 BatomPreto está atualmente em fase de desenvolvimento.
+
 It was originally created for personal use, focused on improving real-time communication while gaming and working.
 Inicialmente foi criado para uso pessoal, com foco em melhorar a comunicação em tempo real durante jogos e trabalho.
+
 I decided to continue developing and sharing it because I believe in open source and collaborative improvement.
 Decidi continuar desenvolvendo e compartilhar o projeto porque acredito no open source e na evolução colaborativa.
 
