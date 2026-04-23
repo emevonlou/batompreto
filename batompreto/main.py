@@ -1,8 +1,8 @@
-import runpy
+from batompreto.legacy_app import main as legacy_main
 
 
 def main() -> None:
-    runpy.run_module("batompreto.legacy_app", run_name="__main__")
+    legacy_main()
 
 
 if __name__ == "__main__":
