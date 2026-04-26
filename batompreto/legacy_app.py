@@ -181,10 +181,12 @@ def iniciar_movimento(event):
     root._drag_start_x = event.x
     root._drag_start_y = event.y
 
+
 def mover_janela(event):
     x = event.x_root - root._drag_start_x
     y = event.y_root - root._drag_start_y
     root.geometry(f"+{x}+{y}")
+
 
 def on_close(event=None):
     try:
