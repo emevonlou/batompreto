@@ -1,4 +1,4 @@
-name: Build Windows EXE
+name: Build Windows Installer
 
 on:
   workflow_dispatch:
@@ -22,18 +22,28 @@ jobs:
       - name: Install dependencies
         run: |
           pip install -r requirements.txt
-          pip install pyinstaller
-
-      - name: Install Tesseract
-        run: |
-          choco install tesseract
+          pip install pyinstaller pillow
 
       - name: Build EXE
         run: |
-          pyinstaller --onefile --windowed --icon=icon.png app.py
+          pyinstaller --onefile --windowed --name batompreto --icon=icon.png --add-data "icon.png;." app.py
 
-      - name: Upload artifact
+      - name: Create ICO
+        run: |
+          python - <<'PY'
+          from PIL import Image
+          img = Image.open("icon.png")
+          img.save("icon.ico", sizes=[(256,256), (128,128), (64,64), (48,48), (32,32), (16,16)])
+          PY
+
+      - name: Install Inno Setup
+        run: choco install innosetup -y
+
+      - name: Build Installer
+        run: '& "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" installer.iss'
+
+      - name: Upload installer
         uses: actions/upload-artifact@v4
         with:
-          name: batompreto-windows
-          path: dist/app.exe
+          name: batompreto-windows-installer
+          path: dist/batompreto-setup.exe
