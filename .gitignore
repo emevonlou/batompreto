@@ -5,7 +5,10 @@ __pycache__/
 *.py[cod]
 *$py.class
 
+
+# =========================
 # Distribuição / empacotamento
+# =========================
 .Python
 build/
 dist/
@@ -22,14 +25,23 @@ wheels/
 .installed.cfg
 *.egg
 
+
+# =========================
 # PyInstaller
+# =========================
 *.manifest
 *.spec
 
+
+# =========================
 # Logs
+# =========================
 *.log
 
+
+# =========================
 # Unit tests / coverage
+# =========================
 .coverage
 .coverage.*
 .cache
@@ -40,32 +52,28 @@ coverage.xml
 .hypothesis/
 .pytest_cache/
 
+
+# =========================
 # Ambiente virtual
+# =========================
 venv/
 .env/
 .venv/
 ENV/
 env/
 
+
+# =========================
 # IDEs
+# =========================
 .vscode/
 .idea/
 *.sublime-project
 *.sublime-workspace
 
+
+# =========================
 # Sistema
+# =========================
 .DS_Store
 Thumbs.db
-
-# =========================
-# Seus builds (IMPORTANTE)
-# =========================
-release/
-*.zip
-*.rpm
-
-# =========================
-# Outros opcionais
-# =========================
-*.sqlite3
-*.db
