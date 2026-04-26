@@ -185,8 +185,8 @@ def iniciar_movimento(event):
 def mover_janela(event):
     x = event.x_root - root._drag_start_x
     y = event.y_root - root._drag_start_y
-    root.geometry(f"+{x}+{y}")
-
+    root.geometry("470x380+3360+40")
+    root.minsize(450, 330)
 
 def on_close(event=None):
     try:
@@ -435,7 +435,7 @@ saida = tk.Text(
     padx=6,
     pady=6,
 )
-saida.pack(fill="x", pady=(3, 4))
+saida.pack(fill="both", expand=True, pady=(3, 4))
 
 status = tk.Label(
     body,
