@@ -181,12 +181,10 @@ def iniciar_movimento(event):
     root._drag_start_x = event.x
     root._drag_start_y = event.y
 
-
 def mover_janela(event):
     x = event.x_root - root._drag_start_x
     y = event.y_root - root._drag_start_y
-    root.geometry("470x380+3360+40")
-    root.minsize(450, 330)
+    root.geometry(f"+{x}+{y}")
 
 def on_close(event=None):
     try:
@@ -228,8 +226,8 @@ root.after(50, lambda: root.overrideredirect(True))
 root.attributes("-topmost", True)
 root.attributes("-alpha", 0.0)
 root.configure(bg="#090909")
-root.geometry("470x310+3360+40")
-root.minsize(450, 295)
+root.geometry("470x380+3360+40")
+root.minsize(450, 330)
 
 mode_var = tk.StringVar(value="en")
 status_var = tk.StringVar(value="Ready")
