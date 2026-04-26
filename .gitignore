@@ -77,3 +77,4 @@ env/
 # =========================
 .DS_Store
 Thumbs.db
+package-rpm/opt/
