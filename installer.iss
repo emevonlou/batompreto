@@ -10,11 +10,11 @@ SolidCompression=yes
 SetupIconFile=icon.ico
 
 [Files]
-Source: "dist\app.exe"; DestDir: "{app}"; Flags: ignoreversion
+Source: "dist\batompreto.exe"; DestDir: "{app}"; Flags: ignoreversion
 
 [Icons]
-Name: "{group}\batompreto"; Filename: "{app}\app.exe"
-Name: "{commondesktop}\batompreto"; Filename: "{app}\app.exe"; Tasks: desktopicon
+Name: "{group}\batompreto"; Filename: "{app}\batompreto.exe"
+Name: "{commondesktop}\batompreto"; Filename: "{app}\batompreto.exe"; Tasks: desktopicon
 
 [Tasks]
 Name: "desktopicon"; Description: "Create a desktop shortcut"; GroupDescription: "Additional icons:"
