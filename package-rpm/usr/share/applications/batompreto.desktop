@@ -1,7 +1,11 @@
 [Desktop Entry]
-Name=Batompreto
-Comment=Personal open-source productivity app
-Exec=batompreto
-Terminal=false
+Version=1.0
 Type=Application
+Name=batompreto
+Comment=Floating OCR translator (PT ↔ EN)
+Exec=/opt/batompreto/batompreto
+Icon=/usr/share/pixmaps/batompreto.png
+Terminal=false
 Categories=Utility;
+StartupNotify=false
+
