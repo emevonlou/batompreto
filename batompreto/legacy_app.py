@@ -34,8 +34,19 @@ def focus_input(event=None):
 
 
 def mostrar_saida(texto):
+    saida.config(state="normal")
     saida.delete("1.0", tk.END)
-    saida.insert("1.0", texto)
+    saida.configure(fg="#c8ffe0")
+
+    def escrever(i=0):
+        if i < len(texto):
+            saida.insert(tk.END, texto[i])
+            saida.see(tk.END)
+            root.after(6, escrever, i + 1)
+        else:
+            root.after(180, lambda: saida.configure(fg="#9cffc7"))
+
+    escrever()
 
 
 def traduzir_texto(texto, destino):
