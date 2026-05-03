@@ -1,126 +1,92 @@
-# Batompreto
+# batompreto 🖤💄
 
-## EN
+Floating OCR translator for games, chats and on-screen text.
 
-Batompreto is a personal desktop application created as an experimental and evolving open-source project.
-
-It focuses on small, practical utilities related to text handling and everyday workflows.
+batompreto is a lightweight overlay translator with PT ↔ EN support, manual translation, OCR screen reading and smart filtering for relevant messages.
 
 ---
+
+## Português
+
+### Sobre
+
+batompreto é um tradutor flutuante com OCR, feito para ajudar em conversas, jogos e textos visíveis na tela.
+
+Ele permite traduzir manualmente textos entre português e inglês, além de capturar texto da tela usando OCR.
+
+### Recursos
+
+- Tradução PT ↔ EN
+- OCR automático da tela
+- Interface flutuante sempre visível
+- Copy e auto-copy
+- Filtro por nicks e mensagens relevantes
+- Suporte para jogos, chats e textos na tela
+- Pacotes para Linux e Windows
+
+### Download
+
+Baixe a versão mais recente em:
+
+**GitHub Releases**
+
+### Executar pelo código-fonte
+
+```bash
+python3 app.py
+
+### Dependências
+
+```bash
+pip install -r requirements.txt
+```
+
+Também é necessário ter o Tesseract OCR instalado no sistema.
+
+## English
+
+### About
+
+batompreto is a floating OCR translator designed for conversations, games and visible on-screen text.
+
+It supports manual PT ↔ EN translation and can also read text directly from the screen using OCR.
 
 ### Features
 
-* Text translation
-* OCR (text extraction from images)
-* Text processing and filtering
-* Clipboard interaction
-* Lightweight desktop interface
+- PT ↔ EN translation
+- Automatic screen OCR
+- Always-on-top floating overlay
+- Copy and auto-copy support
+- Nickname and relevant message filtering
+- Works with games, chats and on-screen text
+- Linux and Windows builds
 
----
+### Download
 
-### Usage
+Download the latest version from:
 
-#### Portable version
+- GitHub Releases
+Run from source:
 
-Extract the `.zip` file and run:
-
-```
-./batompreto
-```
-
-#### RPM installation (Fedora)
-
-```
-sudo dnf install batompreto-0.1.0-1.x86_64.rpm
+```bash
+python3 app.py
 ```
 
-Then:
+### Requirements
 
-```
-batompreto
-```
-
----
-
-### Notes
-
-* The project is under active development
-* Behavior may vary depending on system configuration
-* Developed and tested on Linux (Fedora)
-
----
-
-### Scope
-
-This project is intentionally simple and exploratory.
-It was built as a personal tool and is being gradually improved.
-
----
-
-### Author
-
-Ellie
-
----
-
-## PT-BR
-
-Batompreto é uma aplicação desktop pessoal criada como um projeto experimental e em evolução.
-
-O foco está em utilidades práticas relacionadas a manipulação de texto e fluxos simples do dia a dia.
-
----
-
-### Funcionalidades
-
-* Tradução de texto
-* OCR (extração de texto de imagens)
-* Processamento e filtros de texto
-* Interação com área de transferência
-* Interface leve para uso local
-
----
-
-### Como usar
-
-#### Versão portátil
-
-Extraia o arquivo `.zip` e execute:
-
-```
-./batompreto
+```bash
+pip install -r requirements.txt
 ```
 
-#### Instalação via RPM (Fedora)
+Tesseract OCR must also be installed on the system.
 
-```
-sudo dnf install batompreto-0.1.0-1.x86_64.rpm
-```
+### Platforms
 
-Depois:
+- Linux: .rpm and portable .zip
+- Windows: installer .exe
 
-```
-batompreto
-```
+### Project status
 
----
+batompreto is under active development.
 
-### Observações
-
-* O projeto está em desenvolvimento contínuo
-* O comportamento pode variar dependendo do sistema
-* Desenvolvido e testado em Linux (Fedora)
-
----
-
-### Escopo
-
-Este projeto é propositalmente simples e experimental.
-Foi criado como ferramenta pessoal e está sendo evoluído gradualmente.
-
----
-
-### Autora
-
-Ellie
 
