@@ -1,92 +1,125 @@
-# batompreto 🖤💄
+# BatomPreto 🐈‍⬛
 
-Floating OCR translator for games, chats and on-screen text.
+Real-time translator overlay for productivity and gaming.
 
-batompreto is a lightweight overlay translator with PT ↔ EN support, manual translation, OCR screen reading and smart filtering for relevant messages.
+Tradutor em tempo real com overlay leve para produtividade e jogos.
 
 ---
 
-## Português
+## Badges
 
-### Sobre
+![Build](https://img.shields.io/github/actions/workflow/status/emevonlou/batompreto/ci.yml)
+![Version](https://img.shields.io/github/v/release/emevonlou/batompreto)
+![License](https://img.shields.io/github/license/emevonlou/batompreto)
 
-batompreto é um tradutor flutuante com OCR, feito para ajudar em conversas, jogos e textos visíveis na tela.
+---
 
-Ele permite traduzir manualmente textos entre português e inglês, além de capturar texto da tela usando OCR.
+##  Features / Funcionalidades
 
-### Recursos
+- Real-time translation while typing  
+- Lightweight overlay interface  
+- Designed for multitasking (gaming + work)  
+- Focused on usability and simplicity  
 
-- Tradução PT ↔ EN
-- OCR automático da tela
-- Interface flutuante sempre visível
-- Copy e auto-copy
-- Filtro por nicks e mensagens relevantes
-- Suporte para jogos, chats e textos na tela
-- Pacotes para Linux e Windows
+- Tradução em tempo real enquanto digita  
+- Interface leve com overlay  
+- Pensado para multitarefa (jogos + trabalho)  
+- Foco em simplicidade e usabilidade  
 
-### Download
+---
 
-Baixe a versão mais recente em:
+##  Screenshots
 
-**GitHub Releases**
+![Screenshot 1](./screenshots/batompreto03.png)
+![Screenshot 2](./screenshots/batompreto04.png)
 
-### Executar pelo código-fonte
+---
+
+## Installation / Instalação
+
+- Fedora (Recommended) / Fedora (Recomendado)
+
+#### Dependencies / Dependências
 
 ```bash
-python3 app.py
-
-### Dependências
-
+sudo dnf install python3 python3-tkinter crow-translate
+```
+Install using RPM / Instale usando RPM:
 ```bash
-pip install -r requirements.txt
+sudo dnf install ./batompreto-1.1.0-1.fc42.x86_64.rpm
 ```
 
-Também é necessário ter o Tesseract OCR instalado no sistema.
+This is the recommended and fully tested installation method.
+Este é o método recomendado e totalmente testado.
 
-## English
-
-### About
-
-batompreto is a floating OCR translator designed for conversations, games and visible on-screen text.
-
-It supports manual PT ↔ EN translation and can also read text directly from the screen using OCR.
-
-### Features
-
-- PT ↔ EN translation
-- Automatic screen OCR
-- Always-on-top floating overlay
-- Copy and auto-copy support
-- Nickname and relevant message filtering
-- Works with games, chats and on-screen text
-- Linux and Windows builds
-
-### Download
-
-Download the latest version from:
-
-- GitHub Releases
-Run from source:
+### Linux Portable (Experimental) / Linux Portátil (Experimental)
 
 ```bash
-python3 app.py
+unzip batompreto-linux-portable.zip
+cd dist/batompreto
+./batompreto
 ```
 
-### Requirements
+If it does not work, use the RPM version.
+Se não funcionar, utilize a versão RPM.
 
+
+### Usage / Uso
+
+Run:
 ```bash
-pip install -r requirements.txt
+batompreto
 ```
 
-Tesseract OCR must also be installed on the system.
+### Status
 
-### Platforms
+This project is currently under active development.
+Este projeto está em desenvolvimento ativo.
 
-- Linux: .rpm and portable .zip
-- Windows: installer .exe
 
-### Project status
+### About / Sobre
 
-batompreto is under active development.
+BatomPreto was originally created for personal use, focused on improving real-time communication while gaming and working.
+Inicialmente foi criado para uso pessoal, com foco em melhorar a comunicação em tempo real durante jogos e trabalho.
+I decided to continue developing and sharing it because I believe in open source and collaborative improvement.
+Decidi continuar desenvolvendo e compartilhar o projeto porque acredito no open source e na evolução colaborativa.
+
+### Contributing
+
+Contributions are welcome.
+Contribuições são bem-vindas.
+
+### License
+MIT License
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
