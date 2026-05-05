@@ -78,3 +78,16 @@ env/
 .DS_Store
 Thumbs.db
 package-rpm/opt/
+
+
+# =========================
+# Release / builds locais
+# =========================
+release/
+*.zip
+
+# =========================
+# Backups e arquivos temporários
+# =========================
+*.backup*
+*.save
