@@ -1,12 +1,16 @@
 import os
 import subprocess
 import sys
+import tempfile
+from pathlib import Path
 import tkinter as tk
+
 
 # =========================
 # LOCK
 # =========================
-lock_file = "/tmp/batompreto.lock"
+
+lock_file = Path(tempfile.gettempdir()) / "batompreto.lock"
 
 if os.path.exists(lock_file):
     print("batompreto já está rodando 🖤")
