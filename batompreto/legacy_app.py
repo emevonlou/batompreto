@@ -242,7 +242,7 @@ root.after(50, lambda: root.overrideredirect(True))
 root.attributes("-topmost", True)
 root.attributes("-alpha", 0.0)
 root.configure(bg="#090909")
-root.geometry("470x380+3360+40")
+root.geometry("470x380+100+100")
 root.minsize(450, 330)
 
 mode_var = tk.StringVar(value="en")
