@@ -5,7 +5,6 @@ import tempfile
 from pathlib import Path
 import tkinter as tk
 
-
 # =========================
 # LOCK
 # =========================
