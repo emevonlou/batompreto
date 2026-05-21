@@ -54,6 +54,12 @@ coverage.xml
 
 
 # =========================
+# Ruff
+# =========================
+.ruff_cache/
+
+
+# =========================
 # Ambiente virtual
 # =========================
 venv/
@@ -77,18 +83,19 @@ env/
 # =========================
 .DS_Store
 Thumbs.db
-package-rpm/opt/
 
 
 # =========================
 # Release / builds locais
 # =========================
 release/
+package-rpm/
 *.zip
+*.rpm
+
 
 # =========================
 # Backups e arquivos temporários
 # =========================
 *.backup*
 *.save
-package-rpm/
