@@ -8,10 +8,8 @@ Tradutor em tempo real com overlay leve para produtividade e jogos.
 
 ## Badges
 
-![Build](https://img.shields.io/github/actions/workflow/status/emevonlou/batompreto/python-tests.yml?label=build)
-
+![Build](https://img.shields.io/github/actions/workflow/status/emevonlou/batompreto/ci.yml?label=build)
 ![Release](https://img.shields.io/github/v/release/emevonlou/batompreto?label=release)
-
 ![License](https://img.shields.io/github/license/emevonlou/batompreto?label=license)
 
 ---
